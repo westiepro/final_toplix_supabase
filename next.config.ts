@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Explicitly use webpack instead of Turbopack
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
@@ -21,6 +22,8 @@ const nextConfig: NextConfig = {
     }
     return config;
   },
+  // Add empty turbopack config to silence the error
+  turbopack: {},
 };
 
 export default nextConfig;
