@@ -17,6 +17,7 @@ export default function AdminDashboard() {
     totalUsers: 0,
     averageSalePrice: 0,
   })
+  const [chartHeights, setChartHeights] = useState<number[]>([])
 
   useEffect(() => {
     // Load mock data
@@ -37,6 +38,9 @@ export default function AdminDashboard() {
       totalUsers: 4,
       averageSalePrice: Math.round(avgPrice),
     })
+
+    // Generate chart heights on client side only
+    setChartHeights([1, 2, 3, 4, 5].map(() => 80 + Math.random() * 20))
   }, [])
 
   return (
@@ -158,12 +162,21 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="flex h-64 items-end justify-center gap-4">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className="flex flex-col items-center gap-2">
-                    <div className="w-12 bg-primary rounded-t" style={{ height: `${80 + Math.random() * 20}%` }} />
-                    <span className="text-xs text-muted-foreground">City {i}</span>
-                  </div>
-                ))}
+                {chartHeights.length > 0 ? (
+                  chartHeights.map((height, i) => (
+                    <div key={i} className="flex flex-col items-center gap-2">
+                      <div className="w-12 bg-primary rounded-t" style={{ height: `${height}%` }} />
+                      <span className="text-xs text-muted-foreground">City {i + 1}</span>
+                    </div>
+                  ))
+                ) : (
+                  [1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="flex flex-col items-center gap-2">
+                      <div className="w-12 bg-primary rounded-t" style={{ height: '80%' }} />
+                      <span className="text-xs text-muted-foreground">City {i}</span>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>

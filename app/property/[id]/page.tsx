@@ -68,7 +68,7 @@ export default function PropertyPage() {
         <div className="text-center">
           <h1 className="mb-4 text-2xl font-bold">Property Not Found</h1>
           <Button asChild>
-            <Link href={property?.listing_type === 'rent' ? '/rent' : '/buy'}>Back to Listings</Link>
+            <Link href="/buy">Back to Listings</Link>
           </Button>
         </div>
       </div>

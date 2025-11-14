@@ -98,12 +98,7 @@ export function AdminSidebar() {
                   isActive 
                     ? "text-primary" 
                     : "text-blue-600 group-hover:text-primary"
-                )} 
-                style={{
-                  position: 'relative',
-                  left: 0
-                }}
-                />
+                )} />
                 <span 
                   className={cn(
                     'whitespace-nowrap transition-all duration-300 ease-in-out',
