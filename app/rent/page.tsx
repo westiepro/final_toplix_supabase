@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { PropertyFilters, FilterState } from '@/components/property-filters'
 import { PropertyCard } from '@/components/property-card'
 import { geocodeCity, PropertyMapRef } from '@/components/property-map'
 import { Property } from '@/types/property'
-import { supabase } from '@/lib/supabase'
 import { Loader2 } from 'lucide-react'
 
 const PropertyMap = dynamic(
@@ -37,37 +36,15 @@ export default function RentPage() {
     minArea: 0,
     maxArea: 10000,
   })
-  const [loading, setLoading] = useState(true)
-  const [mapCenter, setMapCenter] = useState<[number, number]>([-74.006, 40.7128])
+  const [mapCenter, setMapCenter] = useState<[number, number]>([-7.9322, 37.0194]) // Faro, Algarve
   const [mapZoom, setMapZoom] = useState(10)
+  const [loading, setLoading] = useState(true)
   const mapRef = useRef<PropertyMapRef>(null)
 
-  useEffect(() => {
-    loadProperties()
-  }, [])
-
-  useEffect(() => {
-    applyFilters()
-  }, [properties, filters])
-
-  const loadProperties = async () => {
-    try {
-      setLoading(true)
-      const mockProperties = generateMockRentProperties()
-      setProperties(mockProperties)
-      setFilteredProperties(mockProperties)
-      setViewportProperties(mockProperties)
-    } catch (error) {
-      console.error('Error loading properties:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const applyFilters = () => {
+  const applyFilters = useCallback(() => {
     let filtered = [...properties]
 
-    // Filter by listing type (rent)
+    // Filter by listing type (rent only)
     filtered = filtered.filter((p) => p.listing_type === 'rent')
 
     // Filter by city
@@ -104,9 +81,27 @@ export default function RentPage() {
 
     setFilteredProperties(filtered)
     setViewportProperties(filtered)
+  }, [properties, filters])
+
+  useEffect(() => {
+    applyFilters()
+  }, [applyFilters])
+
+  const loadProperties = async () => {
+    try {
+      setLoading(true)
+      const mockProperties = generateMockRentProperties()
+      setProperties(mockProperties)
+      setFilteredProperties(mockProperties)
+      setViewportProperties(mockProperties)
+    } catch (error) {
+      console.error('Error loading properties:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleCitySearch = async (city: string) => {
+  const handleCitySearch = useCallback(async (city: string) => {
     if (!city) return
 
     const coordinates = await geocodeCity(city)
@@ -117,28 +112,57 @@ export default function RentPage() {
         mapRef.current.flyToLocation(coordinates[0], coordinates[1], 12)
       }
     }
-  }
+  }, [])
 
-  const handleViewportChange = (bounds: {
+  const viewportTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const filteredPropertiesRef = useRef(filteredProperties)
+  
+  useEffect(() => {
+    filteredPropertiesRef.current = filteredProperties
+  }, [filteredProperties])
+  
+  const handleViewportChange = useCallback((bounds: {
     ne: [number, number]
     sw: [number, number]
   }) => {
-    const inViewport = filteredProperties.filter((property) => {
-      const lat = property.latitude
-      const lng = property.longitude
-      return (
-        lat >= bounds.sw[1] &&
-        lat <= bounds.ne[1] &&
-        lng >= bounds.sw[0] &&
-        lng <= bounds.ne[0]
-      )
-    })
-    setViewportProperties(inViewport)
-  }
+    if (viewportTimeoutRef.current) {
+      clearTimeout(viewportTimeoutRef.current)
+    }
+    
+    viewportTimeoutRef.current = setTimeout(() => {
+      const inViewport = filteredPropertiesRef.current.filter((property) => {
+        const lat = property.latitude
+        const lng = property.longitude
+        return (
+          lat >= bounds.sw[1] &&
+          lat <= bounds.ne[1] &&
+          lng >= bounds.sw[0] &&
+          lng <= bounds.ne[0]
+        )
+      })
+      setViewportProperties(inViewport)
+    }, 200)
+  }, [])
+  
+  useEffect(() => {
+    return () => {
+      if (viewportTimeoutRef.current) {
+        clearTimeout(viewportTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const handleSaveSearch = () => {
-    alert('Search saved! (Feature coming soon)')
+    console.log('Saving search with filters:', filters)
   }
+
+  const handleFiltersChange = useCallback((newFilters: FilterState) => {
+    setFilters(newFilters)
+  }, [])
+
+  useEffect(() => {
+    loadProperties()
+  }, [])
 
   if (loading) {
     return (
@@ -151,23 +175,20 @@ export default function RentPage() {
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col">
       <PropertyFilters
-        onFiltersChange={setFilters}
+        onFiltersChange={handleFiltersChange}
         onCitySearch={handleCitySearch}
         onSaveSearch={handleSaveSearch}
       />
-      <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
-        {/* Left Column - Property Cards */}
-        <div className="flex-1 overflow-y-auto border-r bg-background lg:w-2/3">
-          <div className="p-4">
-            <h2 className="mb-4 text-lg font-semibold">
-              Properties ({viewportProperties.length})
-            </h2>
+      <div className="flex flex-1 overflow-hidden">
+        {/* Property Cards - Left Side */}
+        <div className="w-full overflow-y-auto border-r bg-background lg:w-1/2">
+          <div className="container mx-auto p-4">
             {viewportProperties.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-muted-foreground">
-                <p>No properties found in this area</p>
+              <div className="flex h-full items-center justify-center py-12">
+                <p className="text-muted-foreground">No properties found in this area</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {viewportProperties.map((property) => (
                   <PropertyCard key={property.id} property={property} />
                 ))}
@@ -176,8 +197,8 @@ export default function RentPage() {
           </div>
         </div>
 
-        {/* Right Column - Map */}
-        <div className="h-[400px] flex-1 overflow-hidden lg:h-auto lg:w-1/3">
+        {/* Map - Right Side */}
+        <div className="hidden w-full lg:block lg:w-1/2">
           <PropertyMap
             ref={mapRef}
             properties={filteredProperties}
@@ -194,11 +215,14 @@ export default function RentPage() {
 // Generate mock rent properties
 function generateMockRentProperties(): Property[] {
   const cities = [
-    { name: 'New York', lat: 40.7128, lng: -74.006 },
-    { name: 'Los Angeles', lat: 34.0522, lng: -118.2437 },
-    { name: 'Chicago', lat: 41.8781, lng: -87.6298 },
-    { name: 'Houston', lat: 29.7604, lng: -95.3698 },
-    { name: 'Phoenix', lat: 33.4484, lng: -112.074 },
+    { name: 'Faro', lat: 37.0194, lng: -7.9322 },
+    { name: 'Lagos', lat: 37.1020, lng: -8.6753 },
+    { name: 'Portimão', lat: 37.1386, lng: -8.5378 },
+    { name: 'Albufeira', lat: 37.0889, lng: -8.2503 },
+    { name: 'Tavira', lat: 37.1264, lng: -7.6486 },
+    { name: 'Loulé', lat: 37.1377, lng: -8.0197 },
+    { name: 'Vilamoura', lat: 37.0764, lng: -8.1097 },
+    { name: 'Carvoeiro', lat: 37.0975, lng: -8.4681 },
   ]
 
   const propertyTypes: Property['property_type'][] = [
@@ -206,35 +230,36 @@ function generateMockRentProperties(): Property[] {
     'apartment',
     'condo',
     'townhouse',
+    'villa',
   ]
 
   const properties: Property[] = []
 
   cities.forEach((city, cityIndex) => {
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
       const propertyType =
         propertyTypes[Math.floor(Math.random() * propertyTypes.length)]
       const bedrooms = Math.floor(Math.random() * 3) + 1
       const bathrooms = Math.floor(Math.random() * 2) + 1
       const area = Math.floor(Math.random() * 2000) + 600
-      const basePrice = (cityIndex + 1) * 500 + Math.random() * 2000
+      const basePrice = (cityIndex + 1) * 500 + Math.random() * 1500
 
       properties.push({
-        id: `rent-${city.name}-${i}-${Date.now()}`,
+        id: `rent-${city.name}-${i}`,
         title: `${propertyType.charAt(0).toUpperCase() + propertyType.slice(1)} for Rent in ${city.name}`,
-        description: `Spacious ${propertyType} available for rent in ${city.name}.`,
+        description: `Spacious ${propertyType} available for rent in ${city.name}, Algarve.`,
         price: Math.floor(basePrice),
         property_type: propertyType,
         listing_type: 'rent',
         bedrooms,
         bathrooms,
         area,
-        address: `${Math.floor(Math.random() * 9999)} Oak Ave`,
+        address: `${Math.floor(Math.random() * 999)} Rua ${['da Praia', 'do Sol', 'dos Pescadores', 'da Igreja', 'Principal'][i]}`,
         city: city.name,
-        state: 'CA',
-        zip_code: `${Math.floor(Math.random() * 90000) + 10000}`,
-        latitude: city.lat + (Math.random() - 0.5) * 0.1,
-        longitude: city.lng + (Math.random() - 0.5) * 0.1,
+        state: 'Algarve',
+        zip_code: `${8000 + Math.floor(Math.random() * 999)}`,
+        latitude: city.lat + (Math.random() * 0.05 + 0.02),
+        longitude: city.lng + (Math.random() - 0.5) * 0.05,
         images: [
           `https://images.unsplash.com/photo-${1568605114967 + i}-a6c3738ba01d?w=800`,
         ],
@@ -246,4 +271,3 @@ function generateMockRentProperties(): Property[] {
 
   return properties
 }
-

@@ -1,3 +1,5 @@
+'use client'
+
 import Link from 'next/link'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
@@ -25,11 +27,11 @@ export default function Home() {
             <HomeIcon className="h-12 w-12 text-primary" />
           </div>
         </div>
-        
+
         <h1 className="mb-6 text-5xl font-bold tracking-tight text-white sm:text-6xl md:text-7xl lg:text-8xl">
           Find Your Home
         </h1>
-        
+
         <p className="mb-8 text-lg text-white/90 sm:text-xl md:text-2xl">
           Discover your perfect property with Toplix. Browse thousands of homes for sale and rent.
         </p>
@@ -46,7 +48,7 @@ export default function Home() {
               Browse Properties
             </Link>
           </Button>
-          
+
           <Button
             asChild
             size="lg"
@@ -67,14 +69,14 @@ export default function Home() {
               Explore properties for sale with detailed listings and virtual tours
             </p>
           </div>
-          
+
           <div className="rounded-lg bg-white/10 p-6 backdrop-blur-sm">
             <h3 className="mb-2 text-xl font-semibold text-white">Rent</h3>
             <p className="text-white/80">
               Find your next rental with flexible lease options and great locations
             </p>
           </div>
-          
+
           <div className="rounded-lg bg-white/10 p-6 backdrop-blur-sm">
             <h3 className="mb-2 text-xl font-semibold text-white">Explore</h3>
             <p className="text-white/80">

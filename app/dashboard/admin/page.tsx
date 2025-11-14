@@ -3,509 +3,277 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Badge } from '@/components/ui/badge'
-import { Building2, Users, Edit, Trash2, Plus } from 'lucide-react'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-
-interface Company {
-  id: string
-  name: string
-  description: string
-  logo_url?: string
-  website?: string
-  created_at: string
-}
-
-interface User {
-  id: string
-  email: string
-  name: string
-  role: 'user' | 'agent' | 'admin'
-  created_at: string
-}
+import { AdminHeader } from '@/components/admin-header'
+import { Eye, Building2, Home, List, Users, Euro, BarChart3 } from 'lucide-react'
+import { Property } from '@/types/property'
+import Link from 'next/link'
 
 export default function AdminDashboard() {
-  const [companies, setCompanies] = useState<Company[]>([])
-  const [users, setUsers] = useState<User[]>([])
-  const [isCompanyDialogOpen, setIsCompanyDialogOpen] = useState(false)
-  const [isUserDialogOpen, setIsUserDialogOpen] = useState(false)
-  const [editingCompany, setEditingCompany] = useState<Company | null>(null)
-  const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [stats, setStats] = useState({
+    liveViews: 0,
+    totalCompanies: 0,
+    totalProperties: 0,
+    activeListings: 0,
+    totalUsers: 0,
+    averageSalePrice: 0,
+  })
 
   useEffect(() => {
-    loadData()
+    // Load mock data
+    const buyProperties = generateMockBuyProperties()
+    const rentProperties = generateMockRentProperties()
+    const allProperties = [...buyProperties, ...rentProperties]
+    
+    const buyPrices = buyProperties.map(p => p.price)
+    const avgPrice = buyPrices.length > 0 
+      ? buyPrices.reduce((a, b) => a + b, 0) / buyPrices.length 
+      : 0
+
+    setStats({
+      liveViews: 0,
+      totalCompanies: 1,
+      totalProperties: allProperties.length,
+      activeListings: allProperties.length,
+      totalUsers: 4,
+      averageSalePrice: Math.round(avgPrice),
+    })
   }, [])
 
-  const loadData = () => {
-    // Mock companies
-    setCompanies([
-      {
-        id: '1',
-        name: 'Premium Realty Group',
-        description: 'Leading real estate company in NYC',
-        website: 'https://premiumrealty.com',
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: '2',
-        name: 'Coastal Properties',
-        description: 'Specializing in beachfront properties',
-        website: 'https://coastalproperties.com',
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: '3',
-        name: 'Urban Living Realty',
-        description: 'Modern urban properties',
-        website: 'https://urbanliving.com',
-        created_at: new Date().toISOString(),
-      },
-    ])
-
-    // Mock users
-    setUsers([
-      {
-        id: '1',
-        email: 'john@example.com',
-        name: 'John Doe',
-        role: 'user',
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: '2',
-        email: 'jane@example.com',
-        name: 'Jane Smith',
-        role: 'agent',
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: '3',
-        email: 'admin@example.com',
-        name: 'Admin User',
-        role: 'admin',
-        created_at: new Date().toISOString(),
-      },
-    ])
-  }
-
-  const handleDeleteCompany = (id: string) => {
-    if (confirm('Are you sure you want to delete this company?')) {
-      setCompanies(companies.filter((c) => c.id !== id))
-    }
-  }
-
-  const handleDeleteUser = (id: string) => {
-    if (confirm('Are you sure you want to delete this user?')) {
-      setUsers(users.filter((u) => u.id !== id))
-    }
-  }
-
-  const handleSaveCompany = (data: Partial<Company>) => {
-    if (editingCompany) {
-      setCompanies(
-        companies.map((c) =>
-          c.id === editingCompany.id ? { ...c, ...data } : c
-        )
-      )
-    } else {
-      const newCompany: Company = {
-        id: Date.now().toString(),
-        name: data.name || '',
-        description: data.description || '',
-        website: data.website,
-        logo_url: data.logo_url,
-        created_at: new Date().toISOString(),
-      }
-      setCompanies([...companies, newCompany])
-    }
-    setIsCompanyDialogOpen(false)
-    setEditingCompany(null)
-  }
-
-  const handleSaveUser = (data: Partial<User>) => {
-    if (editingUser) {
-      setUsers(
-        users.map((u) => (u.id === editingUser.id ? { ...u, ...data } : u))
-      )
-    } else {
-      const newUser: User = {
-        id: Date.now().toString(),
-        email: data.email || '',
-        name: data.name || '',
-        role: data.role || 'user',
-        created_at: new Date().toISOString(),
-      }
-      setUsers([...users, newUser])
-    }
-    setIsUserDialogOpen(false)
-    setEditingUser(null)
-  }
-
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Admin Panel</h1>
-        <p className="text-muted-foreground mt-2">
-          Manage real estate companies and site users
-        </p>
+    <div className="min-h-screen bg-background">
+      <AdminHeader title="Admin Panel" />
+      
+      <div className="p-6">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold">Dashboard</h2>
+            <p className="text-muted-foreground">Overview of your property management system</p>
+          </div>
+          <Button asChild>
+            <Link href="/dashboard/admin/properties">View All Properties</Link>
+          </Button>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Live Views</CardTitle>
+              <Eye className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-green-500" />
+                <div className="text-2xl font-bold">{stats.liveViews}</div>
+              </div>
+              <p className="text-xs text-muted-foreground">Active users on site</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Companies</CardTitle>
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalCompanies}</div>
+              <p className="text-xs text-muted-foreground">Real estate companies</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Properties</CardTitle>
+              <Home className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalProperties}</div>
+              <p className="text-xs text-muted-foreground">All properties in system</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Listings</CardTitle>
+              <List className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.activeListings}</div>
+              <p className="text-xs text-muted-foreground">Currently available</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalUsers}</div>
+              <p className="text-xs text-muted-foreground">Registered users</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Average Sale Price</CardTitle>
+              <Euro className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">€{stats.averageSalePrice.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">Properties for sale</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Charts */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Home className="h-5 w-5" />
+                <CardTitle>Properties by Type</CardTitle>
+              </div>
+              <CardDescription>Distribution of property types</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex h-64 items-center justify-center">
+                <div className="h-48 w-48 rounded-full bg-primary/20 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">100%</div>
+                    <div className="text-sm text-muted-foreground">Mixed Types</div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                <CardTitle>Properties by City</CardTitle>
+              </div>
+              <CardDescription>Top 5 cities with most properties</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex h-64 items-end justify-center gap-4">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex flex-col items-center gap-2">
+                    <div className="w-12 bg-primary rounded-t" style={{ height: `${80 + Math.random() * 20}%` }} />
+                    <span className="text-xs text-muted-foreground">City {i}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-
-      <Tabs defaultValue="companies" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="companies" className="gap-2">
-            <Building2 className="h-4 w-4" />
-            Companies
-          </TabsTrigger>
-          <TabsTrigger value="users" className="gap-2">
-            <Users className="h-4 w-4" />
-            Users
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="companies" className="mt-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Real Estate Companies</CardTitle>
-                  <CardDescription>
-                    Manage all registered real estate companies
-                  </CardDescription>
-                </div>
-                <Dialog
-                  open={isCompanyDialogOpen}
-                  onOpenChange={setIsCompanyDialogOpen}
-                >
-                  <DialogTrigger asChild>
-                    <Button onClick={() => setEditingCompany(null)}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Company
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>
-                        {editingCompany ? 'Edit Company' : 'Add New Company'}
-                      </DialogTitle>
-                      <DialogDescription>
-                        {editingCompany
-                          ? 'Update company details'
-                          : 'Add a new real estate company'}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <CompanyForm
-                      company={editingCompany}
-                      onSave={handleSaveCompany}
-                      onCancel={() => {
-                        setIsCompanyDialogOpen(false)
-                        setEditingCompany(null)
-                      }}
-                    />
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {companies.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                  No companies yet
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {companies.map((company) => (
-                    <Card key={company.id}>
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <CardTitle className="text-lg">{company.name}</CardTitle>
-                            <CardDescription>{company.description}</CardDescription>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              size="icon"
-                              variant="secondary"
-                              onClick={() => {
-                                setEditingCompany(company)
-                                setIsCompanyDialogOpen(true)
-                              }}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="destructive"
-                              onClick={() => handleDeleteCompany(company.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        {company.website && (
-                          <a
-                            href={company.website}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-primary hover:underline"
-                          >
-                            {company.website}
-                          </a>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="users" className="mt-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Site Users</CardTitle>
-                  <CardDescription>
-                    Manage all registered users
-                  </CardDescription>
-                </div>
-                <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button onClick={() => setEditingUser(null)}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add User
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>
-                        {editingUser ? 'Edit User' : 'Add New User'}
-                      </DialogTitle>
-                      <DialogDescription>
-                        {editingUser
-                          ? 'Update user details'
-                          : 'Add a new user to the system'}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <UserForm
-                      user={editingUser}
-                      onSave={handleSaveUser}
-                      onCancel={() => {
-                        setIsUserDialogOpen(false)
-                        setEditingUser(null)
-                      }}
-                    />
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {users.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                  No users yet
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {users.map((user) => (
-                    <Card key={user.id}>
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <CardTitle className="text-lg">{user.name}</CardTitle>
-                            <CardDescription>{user.email}</CardDescription>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={
-                                user.role === 'admin'
-                                  ? 'default'
-                                  : user.role === 'agent'
-                                  ? 'secondary'
-                                  : 'outline'
-                              }
-                            >
-                              {user.role}
-                            </Badge>
-                            <Button
-                              size="icon"
-                              variant="secondary"
-                              onClick={() => {
-                                setEditingUser(user)
-                                setIsUserDialogOpen(true)
-                              }}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="destructive"
-                              onClick={() => handleDeleteUser(user.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </CardHeader>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
     </div>
   )
 }
 
-function CompanyForm({
-  company,
-  onSave,
-  onCancel,
-}: {
-  company: Company | null
-  onSave: (data: Partial<Company>) => void
-  onCancel: () => void
-}) {
-  const [formData, setFormData] = useState<Partial<Company>>({
-    name: company?.name || '',
-    description: company?.description || '',
-    website: company?.website || '',
-    logo_url: company?.logo_url || '',
+// Generate mock properties (same as in other pages)
+function generateMockBuyProperties(): Property[] {
+  const cities = [
+    { name: 'Faro', lat: 37.0194, lng: -7.9322 },
+    { name: 'Lagos', lat: 37.1020, lng: -8.6753 },
+    { name: 'Portimão', lat: 37.1386, lng: -8.5378 },
+    { name: 'Albufeira', lat: 37.0889, lng: -8.2503 },
+    { name: 'Tavira', lat: 37.1264, lng: -7.6486 },
+    { name: 'Loulé', lat: 37.1377, lng: -8.0197 },
+    { name: 'Vilamoura', lat: 37.0764, lng: -8.1097 },
+    { name: 'Carvoeiro', lat: 37.0975, lng: -8.4681 },
+  ]
+
+  const propertyTypes: Property['property_type'][] = [
+    'house', 'apartment', 'condo', 'townhouse', 'villa',
+  ]
+
+  const properties: Property[] = []
+
+  cities.forEach((city, cityIndex) => {
+    for (let i = 0; i < 5; i++) {
+      const propertyType = propertyTypes[Math.floor(Math.random() * propertyTypes.length)]
+      const bedrooms = Math.floor(Math.random() * 4) + 1
+      const bathrooms = Math.floor(Math.random() * 3) + 1
+      const area = Math.floor(Math.random() * 3000) + 800
+      const basePrice = (cityIndex + 1) * 100000 + Math.random() * 400000
+
+      properties.push({
+        id: `buy-${city.name}-${i}`,
+        title: `${propertyType.charAt(0).toUpperCase() + propertyType.slice(1)} in ${city.name}`,
+        description: `Beautiful ${propertyType} with modern amenities in the heart of ${city.name}, Algarve.`,
+        price: Math.floor(basePrice),
+        property_type: propertyType,
+        listing_type: 'buy',
+        bedrooms,
+        bathrooms,
+        area,
+        address: `${Math.floor(Math.random() * 999)} Rua ${['da Praia', 'do Sol', 'dos Pescadores', 'da Igreja', 'Principal'][i]}`,
+        city: city.name,
+        state: 'Algarve',
+        zip_code: `${8000 + Math.floor(Math.random() * 999)}`,
+        latitude: city.lat + (Math.random() * 0.05 + 0.02),
+        longitude: city.lng + (Math.random() - 0.5) * 0.05,
+        images: [`https://images.unsplash.com/photo-${1568605114967 + i}-a6c3738ba01d?w=800`],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+    }
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSave(formData)
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="name">Company Name</Label>
-        <Input
-          id="name"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          required
-        />
-      </div>
-      <div>
-        <Label htmlFor="description">Description</Label>
-        <Input
-          id="description"
-          value={formData.description}
-          onChange={(e) =>
-            setFormData({ ...formData, description: e.target.value })
-          }
-          required
-        />
-      </div>
-      <div>
-        <Label htmlFor="website">Website</Label>
-        <Input
-          id="website"
-          type="url"
-          value={formData.website}
-          onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-        />
-      </div>
-      <div>
-        <Label htmlFor="logo_url">Logo URL</Label>
-        <Input
-          id="logo_url"
-          type="url"
-          value={formData.logo_url}
-          onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
-        />
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit">Save Company</Button>
-      </div>
-    </form>
-  )
+  return properties
 }
 
-function UserForm({
-  user,
-  onSave,
-  onCancel,
-}: {
-  user: User | null
-  onSave: (data: Partial<User>) => void
-  onCancel: () => void
-}) {
-  const [formData, setFormData] = useState<Partial<User>>({
-    name: user?.name || '',
-    email: user?.email || '',
-    role: user?.role || 'user',
+function generateMockRentProperties(): Property[] {
+  const cities = [
+    { name: 'Faro', lat: 37.0194, lng: -7.9322 },
+    { name: 'Lagos', lat: 37.1020, lng: -8.6753 },
+    { name: 'Portimão', lat: 37.1386, lng: -8.5378 },
+    { name: 'Albufeira', lat: 37.0889, lng: -8.2503 },
+    { name: 'Tavira', lat: 37.1264, lng: -7.6486 },
+    { name: 'Loulé', lat: 37.1377, lng: -8.0197 },
+    { name: 'Vilamoura', lat: 37.0764, lng: -8.1097 },
+    { name: 'Carvoeiro', lat: 37.0975, lng: -8.4681 },
+  ]
+
+  const propertyTypes: Property['property_type'][] = [
+    'house', 'apartment', 'condo', 'townhouse', 'villa',
+  ]
+
+  const properties: Property[] = []
+
+  cities.forEach((city, cityIndex) => {
+    for (let i = 0; i < 5; i++) {
+      const propertyType = propertyTypes[Math.floor(Math.random() * propertyTypes.length)]
+      const bedrooms = Math.floor(Math.random() * 3) + 1
+      const bathrooms = Math.floor(Math.random() * 2) + 1
+      const area = Math.floor(Math.random() * 2000) + 600
+      const basePrice = (cityIndex + 1) * 500 + Math.random() * 1500
+
+      properties.push({
+        id: `rent-${city.name}-${i}`,
+        title: `${propertyType.charAt(0).toUpperCase() + propertyType.slice(1)} for Rent in ${city.name}`,
+        description: `Spacious ${propertyType} available for rent in ${city.name}, Algarve.`,
+        price: Math.floor(basePrice),
+        property_type: propertyType,
+        listing_type: 'rent',
+        bedrooms,
+        bathrooms,
+        area,
+        address: `${Math.floor(Math.random() * 999)} Rua ${['da Praia', 'do Sol', 'dos Pescadores', 'da Igreja', 'Principal'][i]}`,
+        city: city.name,
+        state: 'Algarve',
+        zip_code: `${8000 + Math.floor(Math.random() * 999)}`,
+        latitude: city.lat + (Math.random() * 0.05 + 0.02),
+        longitude: city.lng + (Math.random() - 0.5) * 0.05,
+        images: [`https://images.unsplash.com/photo-${1568605114967 + i}-a6c3738ba01d?w=800`],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+    }
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSave(formData)
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="name">Name</Label>
-        <Input
-          id="name"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          required
-        />
-      </div>
-      <div>
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          type="email"
-          value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          required
-        />
-      </div>
-      <div>
-        <Label htmlFor="role">Role</Label>
-        <select
-          id="role"
-          value={formData.role}
-          onChange={(e) =>
-            setFormData({ ...formData, role: e.target.value as any })
-          }
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-          required
-        >
-          <option value="user">User</option>
-          <option value="agent">Agent</option>
-          <option value="admin">Admin</option>
-        </select>
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit">Save User</Button>
-      </div>
-    </form>
-  )
+  return properties
 }
-
-
