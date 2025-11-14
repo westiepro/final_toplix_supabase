@@ -399,3 +399,277 @@ function generateMockRentProperties(): Property[] {
 
   return properties
 }
+
+function PropertyForm({
+  property,
+  onSave,
+  onCancel,
+}: {
+  property: PropertyWithCompany
+  onSave: (data: Partial<PropertyWithCompany>) => void
+  onCancel: () => void
+}) {
+  const [formData, setFormData] = useState<Partial<PropertyWithCompany>>({
+    title: property.title || '',
+    description: property.description || '',
+    price: property.price || 0,
+    property_type: property.property_type || 'house',
+    listing_type: property.listing_type || 'buy',
+    bedrooms: property.bedrooms || 0,
+    bathrooms: property.bathrooms || 0,
+    area: property.area || 0,
+    address: property.address || '',
+    city: property.city || '',
+    state: property.state || '',
+    zip_code: property.zip_code || '',
+    latitude: property.latitude || 0,
+    longitude: property.longitude || 0,
+    status: property.status || 'active',
+    company_name: property.company_name || '',
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onSave(formData)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="title">Title</Label>
+          <Input
+            id="title"
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            required
+          />
+        </div>
+        <div>
+          <Label htmlFor="price">Price (€)</Label>
+          <Input
+            id="price"
+            type="number"
+            value={formData.price}
+            onChange={(e) =>
+              setFormData({ ...formData, price: parseInt(e.target.value) || 0 })
+            }
+            required
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="description">Description</Label>
+        <Textarea
+          id="description"
+          value={formData.description}
+          onChange={(e) =>
+            setFormData({ ...formData, description: e.target.value })
+          }
+          required
+          rows={3}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="property_type">Property Type</Label>
+          <Select
+            value={formData.property_type}
+            onValueChange={(value) =>
+              setFormData({
+                ...formData,
+                property_type: value as Property['property_type'],
+              })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select property type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="house">House</SelectItem>
+              <SelectItem value="apartment">Apartment</SelectItem>
+              <SelectItem value="condo">Condo</SelectItem>
+              <SelectItem value="townhouse">Townhouse</SelectItem>
+              <SelectItem value="villa">Villa</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="listing_type">Listing Type</Label>
+          <Select
+            value={formData.listing_type}
+            onValueChange={(value) =>
+              setFormData({
+                ...formData,
+                listing_type: value as Property['listing_type'],
+              })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select listing type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="buy">Buy</SelectItem>
+              <SelectItem value="rent">Rent</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <Label htmlFor="bedrooms">Bedrooms</Label>
+          <Input
+            id="bedrooms"
+            type="number"
+            min="0"
+            value={formData.bedrooms}
+            onChange={(e) =>
+              setFormData({ ...formData, bedrooms: parseInt(e.target.value) || 0 })
+            }
+            required
+          />
+        </div>
+        <div>
+          <Label htmlFor="bathrooms">Bathrooms</Label>
+          <Input
+            id="bathrooms"
+            type="number"
+            min="0"
+            value={formData.bathrooms}
+            onChange={(e) =>
+              setFormData({ ...formData, bathrooms: parseInt(e.target.value) || 0 })
+            }
+            required
+          />
+        </div>
+        <div>
+          <Label htmlFor="area">Area (sqft)</Label>
+          <Input
+            id="area"
+            type="number"
+            min="0"
+            value={formData.area}
+            onChange={(e) =>
+              setFormData({ ...formData, area: parseInt(e.target.value) || 0 })
+            }
+            required
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="address">Address</Label>
+        <Input
+          id="address"
+          value={formData.address}
+          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+          required
+        />
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <Label htmlFor="city">City</Label>
+          <Input
+            id="city"
+            value={formData.city}
+            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+            required
+          />
+        </div>
+        <div>
+          <Label htmlFor="state">State</Label>
+          <Input
+            id="state"
+            value={formData.state}
+            onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+            required
+          />
+        </div>
+        <div>
+          <Label htmlFor="zip_code">Zip Code</Label>
+          <Input
+            id="zip_code"
+            value={formData.zip_code}
+            onChange={(e) =>
+              setFormData({ ...formData, zip_code: e.target.value })
+            }
+            required
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="latitude">Latitude</Label>
+          <Input
+            id="latitude"
+            type="number"
+            step="any"
+            value={formData.latitude}
+            onChange={(e) =>
+              setFormData({ ...formData, latitude: parseFloat(e.target.value) || 0 })
+            }
+            required
+          />
+        </div>
+        <div>
+          <Label htmlFor="longitude">Longitude</Label>
+          <Input
+            id="longitude"
+            type="number"
+            step="any"
+            value={formData.longitude}
+            onChange={(e) =>
+              setFormData({ ...formData, longitude: parseFloat(e.target.value) || 0 })
+            }
+            required
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="status">Status</Label>
+        <Select
+          value={formData.status}
+          onValueChange={(value) =>
+            setFormData({
+              ...formData,
+              status: value as 'active' | 'inactive' | 'pending',
+            })
+          }
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="inactive">Inactive</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label htmlFor="company_name">Company Name</Label>
+        <Input
+          id="company_name"
+          value={formData.company_name}
+          onChange={(e) =>
+            setFormData({ ...formData, company_name: e.target.value })
+          }
+        />
+      </div>
+
+      <div className="flex justify-end gap-2 pt-4">
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit">Save Property</Button>
+      </div>
+    </form>
+  )
+}
