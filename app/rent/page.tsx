@@ -89,12 +89,12 @@ export default function RentPage() {
 
     // Filter by bedrooms
     if (filters.bedrooms !== 'all') {
-      filtered = filtered.filter((p) => p.bedrooms >= filters.bedrooms)
+      filtered = filtered.filter((p) => p.bedrooms >= (filters.bedrooms as number))
     }
 
     // Filter by bathrooms
     if (filters.bathrooms !== 'all') {
-      filtered = filtered.filter((p) => p.bathrooms >= filters.bathrooms)
+      filtered = filtered.filter((p) => p.bathrooms >= (filters.bathrooms as number))
     }
 
     // Filter by area

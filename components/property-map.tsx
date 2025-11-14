@@ -29,25 +29,29 @@ export const PropertyMap = forwardRef<PropertyMapRef, PropertyMapProps>(
     },
     ref
   ) {
-    const [viewState, setViewState] = useState<ViewState>({
-      longitude: initialCenter[0],
-      latitude: initialCenter[1],
-      zoom: initialZoom,
-    })
+  const [viewState, setViewState] = useState<ViewState>({
+    longitude: initialCenter[0],
+    latitude: initialCenter[1],
+    zoom: initialZoom,
+    bearing: 0,
+    pitch: 0,
+    padding: { top: 0, bottom: 0, left: 0, right: 0 },
+  })
     const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
     const mapRef = useRef<any>(null)
 
-    useImperativeHandle(ref, () => ({
-      flyToLocation: (lng: number, lat: number, zoom: number = 12) => {
-        setViewState({
-          longitude: lng,
-          latitude: lat,
-          zoom,
-          pitch: viewState.pitch,
-          bearing: viewState.bearing,
-        })
-      },
-    }))
+  useImperativeHandle(ref, () => ({
+    flyToLocation: (lng: number, lat: number, zoom: number = 12) => {
+      setViewState({
+        longitude: lng,
+        latitude: lat,
+        zoom,
+        pitch: viewState.pitch,
+        bearing: viewState.bearing,
+        padding: viewState.padding,
+      })
+    },
+  }))
 
     useEffect(() => {
       if (mapRef.current && onViewportChange) {

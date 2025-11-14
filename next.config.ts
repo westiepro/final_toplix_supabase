@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   transpilePackages: ['react-map-gl', 'mapbox-gl'],
+  outputFileTracingRoot: path.join(__dirname),
   images: {
     remotePatterns: [
       {

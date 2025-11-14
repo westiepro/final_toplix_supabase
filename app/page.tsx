@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
-import { Home, Search } from 'lucide-react'
+import { Home as HomeIcon, Search } from 'lucide-react'
 
 export default function Home() {
   return (
@@ -22,7 +22,7 @@ export default function Home() {
       <div className="relative z-10 mx-auto max-w-4xl px-4 text-center">
         <div className="mb-6 flex justify-center">
           <div className="rounded-full bg-primary/20 p-4 backdrop-blur-sm">
-            <Home className="h-12 w-12 text-primary" />
+            <HomeIcon className="h-12 w-12 text-primary" />
           </div>
         </div>
         
