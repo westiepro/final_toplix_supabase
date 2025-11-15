@@ -5,9 +5,15 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { AdminHeader } from '@/components/admin-header'
 import { Badge } from '@/components/ui/badge'
-import { Edit, Trash2 } from 'lucide-react'
+import { Edit, Trash2, Plus } from 'lucide-react'
 import { Property } from '@/types/property'
 import Image from 'next/image'
+import {
+  fetchPropertiesWithCompany,
+  createProperty,
+  updateProperty,
+  deleteProperty,
+} from '@/lib/properties'
 import {
   Table,
   TableBody,
@@ -34,6 +40,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { ImageUpload } from '@/components/image-upload'
+import { LocationPicker } from '@/components/location-picker'
 
 interface PropertyWithCompany extends Property {
   company_name?: string
@@ -45,30 +53,35 @@ export default function PropertiesPage() {
   const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set())
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingProperty, setEditingProperty] = useState<PropertyWithCompany | null>(null)
+  const [isAddingProperty, setIsAddingProperty] = useState(false)
 
   useEffect(() => {
     loadProperties()
   }, [])
 
-  const loadProperties = () => {
-    const buyProperties = generateMockBuyProperties()
-    const rentProperties = generateMockRentProperties()
-    const allProperties = [...buyProperties, ...rentProperties].map((p) => ({
-      ...p,
-      company_name: 'Imopix Properties',
-      status: 'active' as const,
-    }))
-    setProperties(allProperties)
+  const loadProperties = async () => {
+    try {
+      const data = await fetchPropertiesWithCompany()
+      setProperties(data)
+    } catch (error) {
+      console.error('Error loading properties:', error)
+      setProperties([])
+    }
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this property?')) {
-      setProperties(properties.filter((p) => p.id !== id))
-      setSelectedProperties((prev) => {
-        const next = new Set(prev)
-        next.delete(id)
-        return next
-      })
+      const success = await deleteProperty(id)
+      if (success) {
+        setProperties(properties.filter((p) => p.id !== id))
+        setSelectedProperties((prev) => {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
+      } else {
+        alert('Failed to delete property. Please try again.')
+      }
     }
   }
 
@@ -80,18 +93,89 @@ export default function PropertiesPage() {
     }
   }
 
-  const handleSave = (data: Partial<PropertyWithCompany>) => {
-    if (editingProperty) {
-      setProperties(
-        properties.map((p) =>
-          p.id === editingProperty.id
-            ? { ...p, ...data, updated_at: new Date().toISOString() }
-            : p
-        )
-      )
+  const handleSave = async (data: Partial<PropertyWithCompany>) => {
+    try {
+      if (editingProperty) {
+        // Update existing property
+        console.log('Updating property:', editingProperty.id, 'with data:', data)
+        const updated = await updateProperty(editingProperty.id, data)
+        if (updated) {
+          setProperties(
+            properties.map((p) =>
+              p.id === editingProperty.id ? { ...p, ...updated } : p
+            )
+          )
+          setIsDialogOpen(false)
+          setEditingProperty(null)
+        } else {
+          console.error('Failed to update property. Check console for details.')
+          
+          // Check if it's a mock property ID
+          const isMockId = editingProperty.id.includes('-') && !editingProperty.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+          
+          if (isMockId) {
+            alert(
+              'Cannot update mock property. This property is from mock data and doesn\'t exist in the database.\n\n' +
+              'Please create a new property instead, or delete this one and create a new one with the same details.'
+            )
+          } else {
+            alert('Failed to update property. Please check the browser console (F12) for detailed error messages.')
+          }
+        }
+      } else {
+        // Create new property
+        const newProperty = await createProperty({
+          title: data.title || '',
+          description: data.description || '',
+          price: data.price || 0,
+          property_type: data.property_type || 'house',
+          listing_type: data.listing_type || 'buy',
+          bedrooms: data.bedrooms || 0,
+          bathrooms: data.bathrooms || 0,
+          area: data.area || 0,
+          address: data.address || '',
+          city: data.city || '',
+          state: '', // Default empty state since field was removed from form
+          zip_code: data.zip_code || '',
+          latitude: data.latitude || 0,
+          longitude: data.longitude || 0,
+          images: data.images || [],
+        } as Omit<Property, 'id' | 'created_at' | 'updated_at'>)
+        
+        if (newProperty) {
+          // Add company_name and status to match PropertyWithCompany interface
+          const propertyWithCompany: PropertyWithCompany = {
+            ...newProperty,
+            company_name: data.company_name || 'Imopix Properties',
+            status: (data.status as 'active' | 'inactive' | 'pending') || 'active',
+          }
+          setProperties([propertyWithCompany, ...properties])
+          setIsDialogOpen(false)
+          setIsAddingProperty(false)
+        } else {
+          // Check if Supabase is configured
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+          const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+          
+          if (!supabaseUrl || !supabaseKey) {
+            alert('Supabase is not configured. Please check your environment variables.')
+          } else {
+            // Try to get more details from the error
+            console.error('Failed to create property. Check console for details.')
+            alert('Failed to create property. Common issues:\n\n1. RLS policies not set up - Run the SQL in supabase-schema.sql\n2. Missing required fields\n3. Invalid data types\n\nPlease check the browser console (F12) for detailed error message.')
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error saving property:', error)
+      alert('An error occurred while saving the property.')
     }
-    setIsDialogOpen(false)
+  }
+
+  const handleAddNew = () => {
     setEditingProperty(null)
+    setIsAddingProperty(true)
+    setIsDialogOpen(true)
   }
 
   const handleSelectAll = (checked: boolean) => {
@@ -129,23 +213,42 @@ export default function PropertiesPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <AdminHeader title="All Properties" />
+      <AdminHeader 
+        title="All Properties"
+        actionButton={
+          <Button onClick={handleAddNew}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Property
+          </Button>
+        }
+      />
       
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={isDialogOpen} onOpenChange={(open) => {
+        setIsDialogOpen(open)
+        if (!open) {
+          setEditingProperty(null)
+          setIsAddingProperty(false)
+        }
+      }}>
+        <DialogContent className="!max-w-[60vw] sm:!max-w-[60vw] w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Property</DialogTitle>
+            <DialogTitle>
+              {editingProperty ? 'Edit Property' : 'Add New Property'}
+            </DialogTitle>
             <DialogDescription>
-              Update property details below
+              {editingProperty
+                ? 'Update property details below'
+                : 'Fill in the details to add a new property'}
             </DialogDescription>
           </DialogHeader>
-          {editingProperty && (
+          {(editingProperty || isAddingProperty) && (
             <PropertyForm
-              property={editingProperty}
+              property={editingProperty || undefined}
               onSave={handleSave}
               onCancel={() => {
                 setIsDialogOpen(false)
                 setEditingProperty(null)
+                setIsAddingProperty(false)
               }}
             />
           )}
@@ -284,157 +387,127 @@ export default function PropertiesPage() {
   )
 }
 
-// Generate mock properties
-function generateMockBuyProperties(): Property[] {
-  const cities = [
-    { name: 'Faro', lat: 37.0194, lng: -7.9322 },
-    { name: 'Lagos', lat: 37.1020, lng: -8.6753 },
-    { name: 'Portimão', lat: 37.1386, lng: -8.5378 },
-    { name: 'Albufeira', lat: 37.0889, lng: -8.2503 },
-    { name: 'Tavira', lat: 37.1264, lng: -7.6486 },
-    { name: 'Loulé', lat: 37.1377, lng: -8.0197 },
-    { name: 'Vilamoura', lat: 37.0764, lng: -8.1097 },
-    { name: 'Carvoeiro', lat: 37.0975, lng: -8.4681 },
-  ]
-
-  const propertyTypes: Property['property_type'][] = [
-    'house', 'apartment', 'condo', 'townhouse', 'villa',
-  ]
-
-  const properties: Property[] = []
-
-  cities.forEach((city, cityIndex) => {
-    for (let i = 0; i < 5; i++) {
-      const propertyType = propertyTypes[Math.floor(Math.random() * propertyTypes.length)]
-      const bedrooms = Math.floor(Math.random() * 4) + 1
-      const bathrooms = Math.floor(Math.random() * 3) + 1
-      const area = Math.floor(Math.random() * 3000) + 800
-      const basePrice = (cityIndex + 1) * 100000 + Math.random() * 400000
-
-      const titleVariations = [
-        `${city.name} ${propertyType.charAt(0).toUpperCase() + propertyType.slice(1)} center`,
-        `${city.name} ${propertyType.charAt(0).toUpperCase() + propertyType.slice(1)}`,
-        `${propertyType.charAt(0).toUpperCase() + propertyType.slice(1)} in ${city.name}`,
-      ]
-      const title = titleVariations[i % titleVariations.length]
-
-      properties.push({
-        id: `buy-${city.name}-${i}`,
-        title: title,
-        description: `Beautiful ${propertyType} with modern amenities in the heart of ${city.name}, Algarve.`,
-        price: Math.floor(basePrice),
-        property_type: propertyType,
-        listing_type: 'buy',
-        bedrooms,
-        bathrooms,
-        area,
-        address: `${Math.floor(Math.random() * 999)} Rua ${['da Praia', 'do Sol', 'dos Pescadores', 'da Igreja', 'Principal'][i]}`,
-        city: city.name,
-        state: 'Algarve',
-        zip_code: `${8000 + Math.floor(Math.random() * 999)}`,
-        latitude: city.lat + (Math.random() * 0.05 + 0.02),
-        longitude: city.lng + (Math.random() - 0.5) * 0.05,
-        images: [`https://images.unsplash.com/photo-${1568605114967 + i}-a6c3738ba01d?w=800`],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-    }
-  })
-
-  return properties
-}
-
-function generateMockRentProperties(): Property[] {
-  const cities = [
-    { name: 'Faro', lat: 37.0194, lng: -7.9322 },
-    { name: 'Lagos', lat: 37.1020, lng: -8.6753 },
-    { name: 'Portimão', lat: 37.1386, lng: -8.5378 },
-    { name: 'Albufeira', lat: 37.0889, lng: -8.2503 },
-    { name: 'Tavira', lat: 37.1264, lng: -7.6486 },
-  ]
-
-  const propertyTypes: Property['property_type'][] = [
-    'house', 'apartment', 'condo', 'townhouse', 'villa',
-  ]
-
-  const properties: Property[] = []
-
-  cities.forEach((city, cityIndex) => {
-    for (let i = 0; i < 5; i++) {
-      const propertyType = propertyTypes[Math.floor(Math.random() * propertyTypes.length)]
-      const bedrooms = Math.floor(Math.random() * 3) + 1
-      const bathrooms = Math.floor(Math.random() * 2) + 1
-      const area = Math.floor(Math.random() * 2000) + 600
-      const basePrice = (cityIndex + 1) * 500 + Math.random() * 1500
-
-      const titleVariations = [
-        `Rental in ${city.name}`,
-        `${city.name} ${propertyType.charAt(0).toUpperCase() + propertyType.slice(1)} for Rent`,
-        `${propertyType.charAt(0).toUpperCase() + propertyType.slice(1)} for Rent in ${city.name}`,
-      ]
-      const title = titleVariations[i % titleVariations.length]
-
-      properties.push({
-        id: `rent-${city.name}-${i}`,
-        title: title,
-        description: `Spacious ${propertyType} available for rent in ${city.name}, Algarve.`,
-        price: Math.floor(basePrice),
-        property_type: propertyType,
-        listing_type: 'rent',
-        bedrooms,
-        bathrooms,
-        area,
-        address: `${Math.floor(Math.random() * 999)} Rua ${['da Praia', 'do Sol', 'dos Pescadores', 'da Igreja', 'Principal'][i]}`,
-        city: city.name,
-        state: 'Algarve',
-        zip_code: `${8000 + Math.floor(Math.random() * 999)}`,
-        latitude: city.lat + (Math.random() * 0.05 + 0.02),
-        longitude: city.lng + (Math.random() - 0.5) * 0.05,
-        images: [`https://images.unsplash.com/photo-${1568605114967 + i}-a6c3738ba01d?w=800`],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-    }
-  })
-
-  return properties
-}
 
 function PropertyForm({
   property,
   onSave,
   onCancel,
 }: {
-  property: PropertyWithCompany
+  property?: PropertyWithCompany
   onSave: (data: Partial<PropertyWithCompany>) => void
   onCancel: () => void
 }) {
   const [formData, setFormData] = useState<Partial<PropertyWithCompany>>({
-    title: property.title || '',
-    description: property.description || '',
-    price: property.price || 0,
-    property_type: property.property_type || 'house',
-    listing_type: property.listing_type || 'buy',
-    bedrooms: property.bedrooms || 0,
-    bathrooms: property.bathrooms || 0,
-    area: property.area || 0,
-    address: property.address || '',
-    city: property.city || '',
-    state: property.state || '',
-    zip_code: property.zip_code || '',
-    latitude: property.latitude || 0,
-    longitude: property.longitude || 0,
-    status: property.status || 'active',
-    company_name: property.company_name || '',
+    title: property?.title || '',
+    description: property?.description || '',
+    price: property?.price || 0,
+    property_type: property?.property_type || 'house',
+    listing_type: property?.listing_type || 'buy',
+    bedrooms: property?.bedrooms || 0,
+    bathrooms: property?.bathrooms || 0,
+    area: property?.area || 0,
+    address: property?.address || '', // Empty by default
+    city: property?.city || '', // Empty by default
+    zip_code: property?.zip_code || '', // Empty by default
+    latitude: property?.latitude || 0, // 0 by default (not valid coordinates)
+    longitude: property?.longitude || 0, // 0 by default (not valid coordinates)
+    status: property?.status || 'active',
+    images: property?.images || [],
   })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validate that location is set
+    if (!formData.latitude || !formData.longitude || formData.latitude === 0 || formData.longitude === 0) {
+      alert('Please set the property location by clicking on the map or selecting a city.')
+      return
+    }
+    
+    if (!formData.address || !formData.city) {
+      alert('Please set the property location by clicking on the map. The address and city will be automatically filled.')
+      return
+    }
+    
     onSave(formData)
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Location Picker - Moved to top */}
+      <div>
+        <Label>Property Location</Label>
+        <LocationPicker
+          initialLatitude={formData.latitude && formData.latitude !== 0 ? formData.latitude : undefined}
+          initialLongitude={formData.longitude && formData.longitude !== 0 ? formData.longitude : undefined}
+          initialCity={formData.city || ''}
+          onLocationChange={(locationData) => {
+            setFormData({
+              ...formData,
+              latitude: locationData.latitude,
+              longitude: locationData.longitude,
+              address: locationData.address,
+              city: locationData.city,
+              zip_code: locationData.postalCode,
+            })
+          }}
+        />
+        
+        {/* Read-only location fields below map */}
+        <div className="mt-4 grid grid-cols-3 gap-4">
+          <div>
+            <Label htmlFor="address">Address</Label>
+            <Input
+              id="address"
+              value={formData.address}
+              readOnly
+              className="bg-muted"
+            />
+          </div>
+          <div>
+            <Label htmlFor="city">City</Label>
+            <Input
+              id="city"
+              value={formData.city}
+              readOnly
+              className="bg-muted"
+            />
+          </div>
+          <div>
+            <Label htmlFor="zip_code">Postal Code</Label>
+            <Input
+              id="zip_code"
+              value={formData.zip_code}
+              readOnly
+              className="bg-muted"
+            />
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="latitude">Latitude</Label>
+            <Input
+              id="latitude"
+              type="text"
+              value={formData.latitude}
+              readOnly
+              className="bg-muted"
+            />
+          </div>
+          <div>
+            <Label htmlFor="longitude">Longitude</Label>
+            <Input
+              id="longitude"
+              type="text"
+              value={formData.longitude}
+              readOnly
+              className="bg-muted"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Label htmlFor="title">Title</Label>
@@ -546,7 +619,7 @@ function PropertyForm({
           />
         </div>
         <div>
-          <Label htmlFor="area">Area (sqft)</Label>
+          <Label htmlFor="area">Area (m²)</Label>
           <Input
             id="area"
             type="number"
@@ -554,77 +627,6 @@ function PropertyForm({
             value={formData.area}
             onChange={(e) =>
               setFormData({ ...formData, area: parseInt(e.target.value) || 0 })
-            }
-            required
-          />
-        </div>
-      </div>
-
-      <div>
-        <Label htmlFor="address">Address</Label>
-        <Input
-          id="address"
-          value={formData.address}
-          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-          required
-        />
-      </div>
-
-      <div className="grid grid-cols-3 gap-4">
-        <div>
-          <Label htmlFor="city">City</Label>
-          <Input
-            id="city"
-            value={formData.city}
-            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor="state">State</Label>
-          <Input
-            id="state"
-            value={formData.state}
-            onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor="zip_code">Zip Code</Label>
-          <Input
-            id="zip_code"
-            value={formData.zip_code}
-            onChange={(e) =>
-              setFormData({ ...formData, zip_code: e.target.value })
-            }
-            required
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="latitude">Latitude</Label>
-          <Input
-            id="latitude"
-            type="number"
-            step="any"
-            value={formData.latitude}
-            onChange={(e) =>
-              setFormData({ ...formData, latitude: parseFloat(e.target.value) || 0 })
-            }
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor="longitude">Longitude</Label>
-          <Input
-            id="longitude"
-            type="number"
-            step="any"
-            value={formData.longitude}
-            onChange={(e) =>
-              setFormData({ ...formData, longitude: parseFloat(e.target.value) || 0 })
             }
             required
           />
@@ -654,13 +656,10 @@ function PropertyForm({
       </div>
 
       <div>
-        <Label htmlFor="company_name">Company Name</Label>
-        <Input
-          id="company_name"
-          value={formData.company_name}
-          onChange={(e) =>
-            setFormData({ ...formData, company_name: e.target.value })
-          }
+        <ImageUpload
+          images={Array.isArray(formData.images) ? formData.images : []}
+          onChange={(newImages) => setFormData({ ...formData, images: newImages })}
+          maxImages={10}
         />
       </div>
 

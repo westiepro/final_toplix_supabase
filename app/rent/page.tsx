@@ -7,6 +7,7 @@ import { PropertyCard } from '@/components/property-card'
 import { geocodeCity, PropertyMapRef } from '@/components/property-map'
 import { Property } from '@/types/property'
 import { Loader2 } from 'lucide-react'
+import { fetchPropertiesByType } from '@/lib/properties'
 
 const PropertyMap = dynamic(
   () => import('@/components/property-map').then((mod) => mod.PropertyMap),
@@ -90,12 +91,15 @@ export default function RentPage() {
   const loadProperties = async () => {
     try {
       setLoading(true)
-      const mockProperties = generateMockRentProperties()
-      setProperties(mockProperties)
-      setFilteredProperties(mockProperties)
-      setViewportProperties(mockProperties)
+      const data = await fetchPropertiesByType('rent')
+      setProperties(data)
+      setFilteredProperties(data)
+      setViewportProperties(data)
     } catch (error) {
       console.error('Error loading properties:', error)
+      setProperties([])
+      setFilteredProperties([])
+      setViewportProperties([])
     } finally {
       setLoading(false)
     }
@@ -212,62 +216,3 @@ export default function RentPage() {
   )
 }
 
-// Generate mock rent properties
-function generateMockRentProperties(): Property[] {
-  const cities = [
-    { name: 'Faro', lat: 37.0194, lng: -7.9322 },
-    { name: 'Lagos', lat: 37.1020, lng: -8.6753 },
-    { name: 'Portimão', lat: 37.1386, lng: -8.5378 },
-    { name: 'Albufeira', lat: 37.0889, lng: -8.2503 },
-    { name: 'Tavira', lat: 37.1264, lng: -7.6486 },
-    { name: 'Loulé', lat: 37.1377, lng: -8.0197 },
-    { name: 'Vilamoura', lat: 37.0764, lng: -8.1097 },
-    { name: 'Carvoeiro', lat: 37.0975, lng: -8.4681 },
-  ]
-
-  const propertyTypes: Property['property_type'][] = [
-    'house',
-    'apartment',
-    'condo',
-    'townhouse',
-    'villa',
-  ]
-
-  const properties: Property[] = []
-
-  cities.forEach((city, cityIndex) => {
-    for (let i = 0; i < 5; i++) {
-      const propertyType =
-        propertyTypes[Math.floor(Math.random() * propertyTypes.length)]
-      const bedrooms = Math.floor(Math.random() * 3) + 1
-      const bathrooms = Math.floor(Math.random() * 2) + 1
-      const area = Math.floor(Math.random() * 2000) + 600
-      const basePrice = (cityIndex + 1) * 500 + Math.random() * 1500
-
-      properties.push({
-        id: `rent-${city.name}-${i}`,
-        title: `${propertyType.charAt(0).toUpperCase() + propertyType.slice(1)} for Rent in ${city.name}`,
-        description: `Spacious ${propertyType} available for rent in ${city.name}, Algarve.`,
-        price: Math.floor(basePrice),
-        property_type: propertyType,
-        listing_type: 'rent',
-        bedrooms,
-        bathrooms,
-        area,
-        address: `${Math.floor(Math.random() * 999)} Rua ${['da Praia', 'do Sol', 'dos Pescadores', 'da Igreja', 'Principal'][i]}`,
-        city: city.name,
-        state: 'Algarve',
-        zip_code: `${8000 + Math.floor(Math.random() * 999)}`,
-        latitude: city.lat + (Math.random() * 0.05 + 0.02),
-        longitude: city.lng + (Math.random() - 0.5) * 0.05,
-        images: [
-          `https://images.unsplash.com/photo-${1568605114967 + i}-a6c3738ba01d?w=800`,
-        ],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-    }
-  })
-
-  return properties
-}

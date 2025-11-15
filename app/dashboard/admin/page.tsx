@@ -20,27 +20,47 @@ export default function AdminDashboard() {
   const [chartHeights, setChartHeights] = useState<number[]>([])
 
   useEffect(() => {
-    // Load mock data
-    const buyProperties = generateMockBuyProperties()
-    const rentProperties = generateMockRentProperties()
-    const allProperties = [...buyProperties, ...rentProperties]
-    
-    const buyPrices = buyProperties.map(p => p.price)
-    const avgPrice = buyPrices.length > 0 
-      ? buyPrices.reduce((a, b) => a + b, 0) / buyPrices.length 
-      : 0
+    // Load real data from Supabase
+    const loadStats = async () => {
+      try {
+        const { fetchAllProperties } = await import('@/lib/properties')
+        const allProperties = await fetchAllProperties()
+        const buyProperties = allProperties.filter(p => p.listing_type === 'buy')
+        
+        const buyPrices = buyProperties.map(p => p.price)
+        const avgPrice = buyPrices.length > 0 
+          ? buyPrices.reduce((a, b) => a + b, 0) / buyPrices.length 
+          : 0
 
-    setStats({
-      liveViews: 0,
-      totalCompanies: 1,
-      totalProperties: allProperties.length,
-      activeListings: allProperties.length,
-      totalUsers: 4,
-      averageSalePrice: Math.round(avgPrice),
-    })
+        setStats({
+          liveViews: 0,
+          totalCompanies: 1,
+          totalProperties: allProperties.length,
+          activeListings: allProperties.filter(p => {
+            const prop = p as any
+            return prop.status === 'active' || !prop.status
+          }).length,
+          totalUsers: 4,
+          averageSalePrice: Math.round(avgPrice),
+        })
 
-    // Generate chart heights on client side only
-    setChartHeights([1, 2, 3, 4, 5].map(() => 80 + Math.random() * 20))
+        // Generate chart heights on client side only
+        setChartHeights([1, 2, 3, 4, 5].map(() => 80 + Math.random() * 20))
+      } catch (error) {
+        console.error('Error loading stats:', error)
+        // Set default stats if error
+        setStats({
+          liveViews: 0,
+          totalCompanies: 0,
+          totalProperties: 0,
+          activeListings: 0,
+          totalUsers: 0,
+          averageSalePrice: 0,
+        })
+      }
+    }
+
+    loadStats()
   }, [])
 
   return (
@@ -186,107 +206,3 @@ export default function AdminDashboard() {
   )
 }
 
-// Generate mock properties (same as in other pages)
-function generateMockBuyProperties(): Property[] {
-  const cities = [
-    { name: 'Faro', lat: 37.0194, lng: -7.9322 },
-    { name: 'Lagos', lat: 37.1020, lng: -8.6753 },
-    { name: 'Portimão', lat: 37.1386, lng: -8.5378 },
-    { name: 'Albufeira', lat: 37.0889, lng: -8.2503 },
-    { name: 'Tavira', lat: 37.1264, lng: -7.6486 },
-    { name: 'Loulé', lat: 37.1377, lng: -8.0197 },
-    { name: 'Vilamoura', lat: 37.0764, lng: -8.1097 },
-    { name: 'Carvoeiro', lat: 37.0975, lng: -8.4681 },
-  ]
-
-  const propertyTypes: Property['property_type'][] = [
-    'house', 'apartment', 'condo', 'townhouse', 'villa',
-  ]
-
-  const properties: Property[] = []
-
-  cities.forEach((city, cityIndex) => {
-    for (let i = 0; i < 5; i++) {
-      const propertyType = propertyTypes[Math.floor(Math.random() * propertyTypes.length)]
-      const bedrooms = Math.floor(Math.random() * 4) + 1
-      const bathrooms = Math.floor(Math.random() * 3) + 1
-      const area = Math.floor(Math.random() * 3000) + 800
-      const basePrice = (cityIndex + 1) * 100000 + Math.random() * 400000
-
-      properties.push({
-        id: `buy-${city.name}-${i}`,
-        title: `${propertyType.charAt(0).toUpperCase() + propertyType.slice(1)} in ${city.name}`,
-        description: `Beautiful ${propertyType} with modern amenities in the heart of ${city.name}, Algarve.`,
-        price: Math.floor(basePrice),
-        property_type: propertyType,
-        listing_type: 'buy',
-        bedrooms,
-        bathrooms,
-        area,
-        address: `${Math.floor(Math.random() * 999)} Rua ${['da Praia', 'do Sol', 'dos Pescadores', 'da Igreja', 'Principal'][i]}`,
-        city: city.name,
-        state: 'Algarve',
-        zip_code: `${8000 + Math.floor(Math.random() * 999)}`,
-        latitude: city.lat + (Math.random() * 0.05 + 0.02),
-        longitude: city.lng + (Math.random() - 0.5) * 0.05,
-        images: [`https://images.unsplash.com/photo-${1568605114967 + i}-a6c3738ba01d?w=800`],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-    }
-  })
-
-  return properties
-}
-
-function generateMockRentProperties(): Property[] {
-  const cities = [
-    { name: 'Faro', lat: 37.0194, lng: -7.9322 },
-    { name: 'Lagos', lat: 37.1020, lng: -8.6753 },
-    { name: 'Portimão', lat: 37.1386, lng: -8.5378 },
-    { name: 'Albufeira', lat: 37.0889, lng: -8.2503 },
-    { name: 'Tavira', lat: 37.1264, lng: -7.6486 },
-    { name: 'Loulé', lat: 37.1377, lng: -8.0197 },
-    { name: 'Vilamoura', lat: 37.0764, lng: -8.1097 },
-    { name: 'Carvoeiro', lat: 37.0975, lng: -8.4681 },
-  ]
-
-  const propertyTypes: Property['property_type'][] = [
-    'house', 'apartment', 'condo', 'townhouse', 'villa',
-  ]
-
-  const properties: Property[] = []
-
-  cities.forEach((city, cityIndex) => {
-    for (let i = 0; i < 5; i++) {
-      const propertyType = propertyTypes[Math.floor(Math.random() * propertyTypes.length)]
-      const bedrooms = Math.floor(Math.random() * 3) + 1
-      const bathrooms = Math.floor(Math.random() * 2) + 1
-      const area = Math.floor(Math.random() * 2000) + 600
-      const basePrice = (cityIndex + 1) * 500 + Math.random() * 1500
-
-      properties.push({
-        id: `rent-${city.name}-${i}`,
-        title: `${propertyType.charAt(0).toUpperCase() + propertyType.slice(1)} for Rent in ${city.name}`,
-        description: `Spacious ${propertyType} available for rent in ${city.name}, Algarve.`,
-        price: Math.floor(basePrice),
-        property_type: propertyType,
-        listing_type: 'rent',
-        bedrooms,
-        bathrooms,
-        area,
-        address: `${Math.floor(Math.random() * 999)} Rua ${['da Praia', 'do Sol', 'dos Pescadores', 'da Igreja', 'Principal'][i]}`,
-        city: city.name,
-        state: 'Algarve',
-        zip_code: `${8000 + Math.floor(Math.random() * 999)}`,
-        latitude: city.lat + (Math.random() * 0.05 + 0.02),
-        longitude: city.lng + (Math.random() - 0.5) * 0.05,
-        images: [`https://images.unsplash.com/photo-${1568605114967 + i}-a6c3738ba01d?w=800`],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-    }
-  })
-
-  return properties
-}

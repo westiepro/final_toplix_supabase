@@ -7,6 +7,12 @@ import { PropertyCard } from '@/components/property-card'
 import { Property } from '@/types/property'
 import { Plus, Edit, Trash2 } from 'lucide-react'
 import {
+  fetchPropertiesByType,
+  createProperty,
+  updateProperty,
+  deleteProperty,
+} from '@/lib/properties'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -33,15 +39,26 @@ export default function AgentDashboard() {
     loadProperties()
   }, [])
 
-  const loadProperties = () => {
-    // Mock properties for the agent's company
-    const mockProperties = generateMockAgentProperties()
-    setProperties(mockProperties)
+  const loadProperties = async () => {
+    try {
+      // Load both buy and rent properties for agent dashboard
+      const buyProperties = await fetchPropertiesByType('buy')
+      const rentProperties = await fetchPropertiesByType('rent')
+      setProperties([...buyProperties, ...rentProperties])
+    } catch (error) {
+      console.error('Error loading properties:', error)
+      setProperties([])
+    }
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this property?')) {
-      setProperties(properties.filter((p) => p.id !== id))
+      const success = await deleteProperty(id)
+      if (success) {
+        setProperties(properties.filter((p) => p.id !== id))
+      } else {
+        alert('Failed to delete property. Please try again.')
+      }
     }
   }
 
@@ -50,40 +67,54 @@ export default function AgentDashboard() {
     setIsDialogOpen(true)
   }
 
-  const handleSave = (formData: Partial<Property>) => {
-    if (editingProperty) {
-      // Update existing property
-      setProperties(
-        properties.map((p) =>
-          p.id === editingProperty.id ? { ...p, ...formData } : p
-        )
-      )
-    } else {
-      // Add new property
-      const newProperty: Property = {
-        id: Date.now().toString(),
-        title: formData.title || '',
-        description: formData.description || '',
-        price: formData.price || 0,
-        property_type: formData.property_type || 'house',
-        listing_type: formData.listing_type || 'buy',
-        bedrooms: formData.bedrooms || 0,
-        bathrooms: formData.bathrooms || 0,
-        area: formData.area || 0,
-        address: formData.address || '',
-        city: formData.city || '',
-        state: formData.state || '',
-        zip_code: formData.zip_code || '',
-        latitude: formData.latitude || 0,
-        longitude: formData.longitude || 0,
-        images: formData.images || [],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+  const handleSave = async (formData: Partial<Property>) => {
+    try {
+      if (editingProperty) {
+        // Update existing property
+        const updated = await updateProperty(editingProperty.id, formData)
+        if (updated) {
+          setProperties(
+            properties.map((p) =>
+              p.id === editingProperty.id ? updated : p
+            )
+          )
+          setIsDialogOpen(false)
+          setEditingProperty(null)
+        } else {
+          alert('Failed to update property. Please try again.')
+        }
+      } else {
+        // Add new property
+        const newProperty = await createProperty({
+          title: formData.title || '',
+          description: formData.description || '',
+          price: formData.price || 0,
+          property_type: formData.property_type || 'house',
+          listing_type: formData.listing_type || 'buy',
+          bedrooms: formData.bedrooms || 0,
+          bathrooms: formData.bathrooms || 0,
+          area: formData.area || 0,
+          address: formData.address || '',
+          city: formData.city || '',
+          state: formData.state || '',
+          zip_code: formData.zip_code || '',
+          latitude: formData.latitude || 0,
+          longitude: formData.longitude || 0,
+          images: formData.images || [],
+        } as Omit<Property, 'id' | 'created_at' | 'updated_at'>)
+        
+        if (newProperty) {
+          setProperties([...properties, newProperty])
+          setIsDialogOpen(false)
+          setEditingProperty(null)
+        } else {
+          alert('Failed to create property. Please try again.')
+        }
       }
-      setProperties([...properties, newProperty])
+    } catch (error) {
+      console.error('Error saving property:', error)
+      alert('An error occurred while saving the property.')
     }
-    setIsDialogOpen(false)
-    setEditingProperty(null)
   }
 
   return (

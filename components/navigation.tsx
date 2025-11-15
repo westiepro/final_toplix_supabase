@@ -48,9 +48,9 @@ export function Navigation() {
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center space-x-6">
-            <Link href="/" className="flex items-center space-x-2">
+            <Link href="/" className="flex items-center space-x-2 group">
               {/* Logo */}
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#C62828] shadow-sm">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#C62828] shadow-sm transition-transform duration-300 group-hover:scale-110">
                 <svg
                   width="20"
                   height="20"
@@ -85,16 +85,26 @@ export function Navigation() {
             <div className="flex items-center space-x-2">
               <Link href="/buy">
                 <Button
-                  variant={pathname.includes('/buy') ? 'default' : 'ghost'}
-                  className="hidden sm:flex"
+                  variant="ghost"
+                  className={cn(
+                    "hidden sm:flex transition-colors",
+                    pathname.includes('/buy') 
+                      ? "bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/30 dark:text-red-400" 
+                      : "hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                  )}
                 >
                   Buy
                 </Button>
               </Link>
               <Link href="/rent">
                 <Button
-                  variant={pathname.includes('/rent') ? 'default' : 'ghost'}
-                  className="hidden sm:flex"
+                  variant="ghost"
+                  className={cn(
+                    "hidden sm:flex transition-colors",
+                    pathname.includes('/rent') 
+                      ? "bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/30 dark:text-red-400" 
+                      : "hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                  )}
                 >
                   Rent
                 </Button>

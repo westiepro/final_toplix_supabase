@@ -14,34 +14,23 @@ export default function UserDashboard() {
   const [savedSearches, setSavedSearches] = useState<any[]>([])
 
   useEffect(() => {
-    // Load mock data
+    // Load real data from Supabase
     loadDashboardData()
   }, [])
 
-  const loadDashboardData = () => {
-    // Mock favorites
-    const mockFavorites = generateMockProperties().slice(0, 3)
-    setFavorites(mockFavorites)
-
-    // Mock recently viewed
-    const mockRecent = generateMockProperties().slice(3, 6)
-    setRecentlyViewed(mockRecent)
-
-    // Mock saved searches
-    setSavedSearches([
-      {
-        id: '1',
-        name: 'NYC Apartments',
-        filters: { city: 'New York', property_type: 'apartment' },
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: '2',
-        name: 'LA Houses',
-        filters: { city: 'Los Angeles', property_type: 'house' },
-        created_at: new Date().toISOString(),
-      },
-    ])
+  const loadDashboardData = async () => {
+    try {
+      // TODO: Load favorites, recently viewed, and saved searches from Supabase
+      // For now, set empty arrays until these features are implemented
+      setFavorites([])
+      setRecentlyViewed([])
+      setSavedSearches([])
+    } catch (error) {
+      console.error('Error loading dashboard data:', error)
+      setFavorites([])
+      setRecentlyViewed([])
+      setSavedSearches([])
+    }
   }
 
   return (
@@ -163,129 +152,5 @@ export default function UserDashboard() {
   )
 }
 
-function generateMockProperties(): Property[] {
-  return [
-    {
-      id: '1',
-      title: 'Modern Apartment in Faro',
-      description: 'Beautiful apartment with city views',
-      price: 250000,
-      property_type: 'apartment',
-      listing_type: 'buy',
-      bedrooms: 2,
-      bathrooms: 2,
-      area: 1200,
-      address: '123 Rua da Praia',
-      city: 'Faro',
-      state: 'Algarve',
-      zip_code: '8000',
-      latitude: 37.0194,
-      longitude: -7.9322,
-      images: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800'],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: '2',
-      title: 'Luxury Villa in Lagos',
-      description: 'Spacious villa with pool',
-      price: 650000,
-      property_type: 'villa',
-      listing_type: 'buy',
-      bedrooms: 4,
-      bathrooms: 3,
-      area: 2500,
-      address: '456 Rua do Sol',
-      city: 'Lagos',
-      state: 'Algarve',
-      zip_code: '8600',
-      latitude: 37.1020,
-      longitude: -8.6753,
-      images: ['https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=800'],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: '3',
-      title: 'Cozy Condo in Portimão',
-      description: 'Perfect for first-time buyers',
-      price: 180000,
-      property_type: 'condo',
-      listing_type: 'buy',
-      bedrooms: 1,
-      bathrooms: 1,
-      area: 800,
-      address: '789 Rua dos Pescadores',
-      city: 'Portimão',
-      state: 'Algarve',
-      zip_code: '8500',
-      latitude: 37.1386,
-      longitude: -8.5378,
-      images: ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800'],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: '4',
-      title: 'Townhouse in Albufeira',
-      description: 'Family-friendly townhouse',
-      price: 320000,
-      property_type: 'townhouse',
-      listing_type: 'buy',
-      bedrooms: 3,
-      bathrooms: 2,
-      area: 1800,
-      address: '321 Rua da Igreja',
-      city: 'Albufeira',
-      state: 'Algarve',
-      zip_code: '8200',
-      latitude: 37.0889,
-      longitude: -8.2503,
-      images: ['https://images.unsplash.com/photo-1568605114967-a8130c7310c0?w=800'],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: '5',
-      title: 'Villa in Tavira',
-      description: 'Luxury villa with ocean views',
-      price: 1200000,
-      property_type: 'villa',
-      listing_type: 'buy',
-      bedrooms: 5,
-      bathrooms: 4,
-      area: 3500,
-      address: '654 Rua Principal',
-      city: 'Tavira',
-      state: 'Algarve',
-      zip_code: '8800',
-      latitude: 37.1264,
-      longitude: -7.6486,
-      images: ['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800'],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: '6',
-      title: 'Studio Apartment in Loulé',
-      description: 'Affordable studio in downtown',
-      price: 120000,
-      property_type: 'apartment',
-      listing_type: 'buy',
-      bedrooms: 0,
-      bathrooms: 1,
-      area: 500,
-      address: '987 Rua do Sol',
-      city: 'Loulé',
-      state: 'Algarve',
-      zip_code: '8100',
-      latitude: 37.1377,
-      longitude: -8.0197,
-      images: ['https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800'],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-  ]
-}
 
 
