@@ -100,11 +100,24 @@ export function FilterSidebar({
     })
   }, [properties, priceRange])
 
+  // Helper function to format number with commas
+  const formatPrice = useCallback((value: number): string => {
+    if (value === 0) return ''
+    return value.toLocaleString('en-US')
+  }, [])
+
+  // Helper function to parse formatted string to number
+  const parsePrice = useCallback((value: string): number => {
+    // Remove all non-digit characters
+    const cleaned = value.replace(/\D/g, '')
+    return cleaned ? parseInt(cleaned, 10) : 0
+  }, [])
+
   // Sync inputs with ranges
   useEffect(() => {
-    setPriceMinInput(priceRange[0] === 0 ? '' : priceRange[0].toString())
-    setPriceMaxInput(priceRange[1] === 2000000 ? '' : priceRange[1].toString())
-  }, [priceRange])
+    setPriceMinInput(priceRange[0] === 0 ? '' : formatPrice(priceRange[0]))
+    setPriceMaxInput(priceRange[1] === 5000000 ? '' : formatPrice(priceRange[1]))
+  }, [priceRange, formatPrice])
 
   useEffect(() => {
     setAreaMinInput(areaRange[0] === 0 ? '' : areaRange[0].toString())
@@ -124,24 +137,46 @@ export function FilterSidebar({
     const snappedMin = snapToStep(min)
     const snappedMax = snapToStep(max)
     onPriceRangeChange([snappedMin, snappedMax])
-    setPriceMinInput(snappedMin === 0 ? '' : snappedMin.toString())
-    setPriceMaxInput(snappedMax === 2000000 ? '' : snappedMax.toString())
-  }, [snapToStep, onPriceRangeChange])
+    setPriceMinInput(snappedMin === 0 ? '' : formatPrice(snappedMin))
+    setPriceMaxInput(snappedMax === 5000000 ? '' : formatPrice(snappedMax))
+  }, [snapToStep, onPriceRangeChange, formatPrice])
 
   const handlePriceMinInputChange = useCallback((value: string) => {
-    setPriceMinInput(value)
-    const numValue = parseInt(value) || 0
-    const clampedValue = Math.max(0, Math.min(numValue, priceRange[1]))
-    const snappedValue = snapToStep(clampedValue)
-    onPriceRangeChange([snappedValue, priceRange[1]])
+    // Remove all non-digit characters and format with commas
+    const cleaned = value.replace(/\D/g, '')
+    const numValue = cleaned ? parseInt(cleaned, 10) : 0
+    
+    // Format the display value with commas
+    const formatted = cleaned.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+    setPriceMinInput(formatted)
+    
+    if (numValue > 0) {
+      const clampedValue = Math.max(0, Math.min(numValue, priceRange[1]))
+      const snappedValue = snapToStep(clampedValue)
+      onPriceRangeChange([snappedValue, priceRange[1]])
+    } else if (cleaned === '') {
+      // Empty value
+      onPriceRangeChange([0, priceRange[1]])
+    }
   }, [priceRange, snapToStep, onPriceRangeChange])
 
   const handlePriceMaxInputChange = useCallback((value: string) => {
-    setPriceMaxInput(value)
-    const numValue = parseInt(value) || 0
-    const clampedValue = Math.max(priceRange[0], Math.min(numValue, 5000000))
-    const snappedValue = snapToStep(clampedValue)
-    onPriceRangeChange([priceRange[0], snappedValue])
+    // Remove all non-digit characters and format with commas
+    const cleaned = value.replace(/\D/g, '')
+    const numValue = cleaned ? parseInt(cleaned, 10) : 0
+    
+    // Format the display value with commas
+    const formatted = cleaned.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+    setPriceMaxInput(formatted)
+    
+    if (numValue > 0) {
+      const clampedValue = Math.max(priceRange[0], Math.min(numValue, 5000000))
+      const snappedValue = snapToStep(clampedValue)
+      onPriceRangeChange([priceRange[0], snappedValue])
+    } else if (cleaned === '') {
+      // Empty value
+      onPriceRangeChange([priceRange[0], 5000000])
+    }
   }, [priceRange, snapToStep, onPriceRangeChange])
 
   const handleAreaChange = useCallback((values: number[]) => {
@@ -209,21 +244,33 @@ export function FilterSidebar({
               <span>€{priceRange[1].toLocaleString()}</span>
             </div>
             <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                placeholder="0"
-                value={priceMinInput}
-                onChange={(e) => handlePriceMinInputChange(e.target.value)}
-                className="flex-1"
-              />
+              <div className="flex-1 relative">
+                <Input
+                  type="text"
+                  placeholder="0"
+                  value={priceMinInput}
+                  onChange={(e) => handlePriceMinInputChange(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
+                  className="flex-1 pl-6"
+                />
+                {priceMinInput && (
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">€</span>
+                )}
+              </div>
               <span className="text-muted-foreground">-</span>
-              <Input
-                type="number"
-                placeholder="2000000"
-                value={priceMaxInput}
-                onChange={(e) => handlePriceMaxInputChange(e.target.value)}
-                className="flex-1"
-              />
+              <div className="flex-1 relative">
+                <Input
+                  type="text"
+                  placeholder="5,000,000"
+                  value={priceMaxInput}
+                  onChange={(e) => handlePriceMaxInputChange(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
+                  className="flex-1 pl-6"
+                />
+                {priceMaxInput && (
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">€</span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -337,6 +384,7 @@ export function FilterSidebar({
                   const value = parseInt(e.target.value) || 0
                   handleAreaChange([value, areaRange[1]])
                 }}
+                onWheel={(e) => e.currentTarget.blur()}
                 className="flex-1"
               />
               <span className="text-muted-foreground">-</span>
@@ -348,6 +396,7 @@ export function FilterSidebar({
                   const value = parseInt(e.target.value) || 0
                   handleAreaChange([areaRange[0], value])
                 }}
+                onWheel={(e) => e.currentTarget.blur()}
                 className="flex-1"
               />
             </div>

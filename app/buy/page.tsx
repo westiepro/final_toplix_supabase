@@ -6,7 +6,8 @@ import { PropertyFilters, FilterState } from '@/components/property-filters'
 import { PropertyCard } from '@/components/property-card'
 import { geocodeCity, PropertyMapRef } from '@/components/property-map'
 import { Property } from '@/types/property'
-import { Loader2 } from 'lucide-react'
+import { Loader2, List, Map as MapIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { fetchPropertiesByType } from '@/lib/properties'
 import {
   Select,
@@ -36,6 +37,7 @@ export default function BuyPage() {
   const [viewportProperties, setViewportProperties] = useState<Property[]>([])
   const [filters, setFilters] = useState<FilterState>({
     city: '',
+    country: undefined,
     minPrice: 0,
     maxPrice: 2000000,
     propertyType: 'all',
@@ -50,6 +52,7 @@ export default function BuyPage() {
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState<string>('newest')
   const [hoveredPropertyId, setHoveredPropertyId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('map')
   const mapRef = useRef<PropertyMapRef>(null)
 
   const applyFilters = useCallback(() => {
@@ -230,14 +233,53 @@ export default function BuyPage() {
         filteredCount={filteredProperties.length}
         properties={properties}
       />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* View Toggle - Top Right Above Map (PC only) */}
+        <div className="hidden lg:flex absolute top-4 right-4 z-20 items-center gap-1 border rounded-lg p-1 bg-white shadow-lg">
+          <Button
+            variant={viewMode === 'list' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('list')}
+            className="h-8 px-3"
+          >
+            <List className="h-4 w-4 mr-2" />
+            List
+          </Button>
+          <Button
+            variant={viewMode === 'map' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('map')}
+            className="h-8 px-3"
+          >
+            <MapIcon className="h-4 w-4 mr-2" />
+            Map
+          </Button>
+        </div>
+
         {/* Property Cards - Left Side */}
-        <div className="w-full overflow-y-auto border-r bg-background lg:w-1/2">
+        <div className={`w-full overflow-y-auto bg-background ${viewMode === 'map' ? 'border-r lg:w-[53%]' : 'w-full'}`}>
           <div className="container mx-auto p-4">
-            {/* Sort Dropdown and Property Counter */}
-            <div className="mb-4 flex items-center justify-end gap-4">
+            {/* Header and Sort/Counter on same line */}
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                {filters.city 
+                  ? (
+                    <>
+                      Properties for sale in {filters.city.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')}
+                      {filters.country && (
+                        <span className="text-lg">
+                          {filters.country.toLowerCase().includes('portugal') ? '🇵🇹' : filters.country.toLowerCase().includes('spain') || filters.country.toLowerCase().includes('españa') ? '🇪🇸' : ''}
+                        </span>
+                      )}
+                    </>
+                  )
+                  : 'Properties for sale'}
+              </h1>
+              
+              {/* Sort Dropdown and Property Counter */}
+              <div className={`flex items-center gap-4 ${viewMode === 'list' ? 'lg:mr-[180px]' : ''}`}>
               <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-[200px]">
+                <SelectTrigger className="w-[170px]">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
@@ -250,6 +292,7 @@ export default function BuyPage() {
               <div className="text-sm text-muted-foreground">
                 {sortedViewportProperties.length} {sortedViewportProperties.length === 1 ? 'home' : 'homes'}
               </div>
+              </div>
             </div>
             
             {sortedViewportProperties.length === 0 ? (
@@ -257,7 +300,7 @@ export default function BuyPage() {
                 <p className="text-muted-foreground">No properties found in this area</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className={`grid grid-cols-1 gap-4 ${viewMode === 'list' ? 'md:grid-cols-2 lg:grid-cols-4' : 'md:grid-cols-2'}`}>
                 {sortedViewportProperties.map((property) => (
                   <PropertyCard 
                     key={property.id} 
@@ -272,16 +315,18 @@ export default function BuyPage() {
         </div>
 
         {/* Map - Right Side */}
-        <div className="hidden w-full lg:block lg:w-1/2">
-          <PropertyMap
-            ref={mapRef}
-            properties={filteredProperties}
-            onViewportChange={handleViewportChange}
-            initialCenter={mapCenter}
-            initialZoom={mapZoom}
-            hoveredPropertyId={hoveredPropertyId}
-          />
-        </div>
+        {viewMode === 'map' && (
+          <div className="hidden w-full lg:block lg:w-[47%]">
+            <PropertyMap
+              ref={mapRef}
+              properties={filteredProperties}
+              onViewportChange={handleViewportChange}
+              initialCenter={mapCenter}
+              initialZoom={mapZoom}
+              hoveredPropertyId={hoveredPropertyId}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

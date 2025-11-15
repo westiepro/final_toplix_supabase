@@ -84,7 +84,7 @@ export function PropertyCard({ property, onClick, onMouseEnter, onMouseLeave }: 
         }}
       >
         <CardHeader className="p-0 m-0 flex-shrink-0">
-          <div className="relative h-64 w-full overflow-hidden rounded-t-lg bg-muted">
+          <div className="relative h-72 w-full overflow-hidden rounded-t-lg bg-muted">
             {images.length > 0 ? (
               <>
                 <Image
@@ -128,7 +128,7 @@ export function PropertyCard({ property, onClick, onMouseEnter, onMouseLeave }: 
         <CardContent className="px-3 pt-2 pb-2 flex-1 relative">
           {/* Price and action icons */}
           <div className="flex items-center justify-between mb-1.5">
-            <p className="text-2xl font-bold text-blue-600">
+            <p className="text-xl font-bold text-black">
               €{property.price.toLocaleString()}
             </p>
             <div className="flex items-center gap-2">
@@ -153,32 +153,31 @@ export function PropertyCard({ property, onClick, onMouseEnter, onMouseLeave }: 
             </div>
           </div>
           
-          <h3 className="font-semibold text-lg mb-1 line-clamp-1">
+          <h3 className="font-semibold text-base mb-1 line-clamp-1">
             {property.title}
           </h3>
           
-          {/* Location - only city with flag */}
+          {/* Location - only city */}
           <div className="flex items-center gap-1 text-base text-muted-foreground mb-1.5">
             <MapPin className="h-4 w-4" />
             <span>{property.city}</span>
-            <span className="text-lg">🇵🇹</span>
           </div>
           
           {/* Divider line */}
           <div className="border-t border-gray-200 my-1.5"></div>
           
           {/* Property details */}
-          <div className="flex items-center gap-4 text-base">
-            <div className="flex items-center gap-1.5">
-              <Bed className="h-5 w-5 text-muted-foreground" />
+          <div className="flex items-center gap-4 text-lg">
+            <div className="flex items-center gap-2">
+              <Bed className="h-6 w-6 text-muted-foreground" />
               <span className="font-medium">{property.bedrooms}</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Bath className="h-5 w-5 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+              <Bath className="h-6 w-6 text-muted-foreground" />
               <span className="font-medium">{property.bathrooms}</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Square className="h-5 w-5 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+              <Square className="h-6 w-6 text-muted-foreground" />
               <span className="font-medium">{property.area} m²</span>
             </div>
             

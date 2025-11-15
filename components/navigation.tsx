@@ -11,12 +11,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { LogIn, User, Building2, Shield } from 'lucide-react'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
+import { LogIn, User, Building2, Shield, Menu } from 'lucide-react'
 
 export function Navigation() {
   const pathname = usePathname()
   const isAdminPage = pathname?.startsWith('/dashboard/admin') || false
   const [sidebarWidth, setSidebarWidth] = useState(64) // Start collapsed
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   useEffect(() => {
     if (!isAdminPage) return
@@ -47,7 +55,126 @@ export function Navigation() {
     >
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-4">
+            {/* Hamburger Menu */}
+            <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                  aria-label="Open menu"
+                >
+                  <Menu className="h-6 w-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[300px] sm:w-[350px] p-0">
+                <SheetHeader className="p-6 border-b">
+                  <SheetTitle className="flex items-center space-x-3">
+                    <Link 
+                      href="/" 
+                      className="flex items-center space-x-2 group"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      {/* Logo */}
+                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#C62828] shadow-sm transition-transform duration-300 group-hover:scale-110">
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          {/* House outline */}
+                          <path
+                            d="M12 3L3 10V20H9V14H15V20H21V10L12 3Z"
+                            stroke="white"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            fill="none"
+                          />
+                          {/* Door */}
+                          <rect
+                            x="10"
+                            y="14"
+                            width="4"
+                            height="6"
+                            stroke="white"
+                            strokeWidth="2"
+                            fill="none"
+                          />
+                        </svg>
+                      </div>
+                      <span className="text-2xl font-bold text-primary">Toplix</span>
+                    </Link>
+                  </SheetTitle>
+                </SheetHeader>
+
+                <div className="flex flex-col h-full">
+                  {/* Navigation Links */}
+                  <nav className="flex-1 p-4 space-y-2">
+                    <Link
+                      href="/buy"
+                      onClick={() => setIsMenuOpen(false)}
+                      className={cn(
+                        "flex items-center px-4 py-3 rounded-lg transition-all duration-200 text-base font-medium",
+                        pathname.includes('/buy')
+                          ? "bg-blue-100 text-blue-700 shadow-md hover:bg-blue-200"
+                          : "hover:bg-blue-50 hover:text-blue-600 text-foreground"
+                      )}
+                    >
+                      Buy
+                    </Link>
+                    <Link
+                      href="/rent"
+                      onClick={() => setIsMenuOpen(false)}
+                      className={cn(
+                        "flex items-center px-4 py-3 rounded-lg transition-all duration-200 text-base font-medium",
+                        pathname.includes('/rent')
+                          ? "bg-blue-100 text-blue-700 shadow-md hover:bg-blue-200"
+                          : "hover:bg-blue-50 hover:text-blue-400 text-foreground"
+                      )}
+                    >
+                      Rent
+                    </Link>
+                  </nav>
+
+                  {/* Login Section */}
+                  <div className="border-t p-4 space-y-2">
+                    <div className="px-4 py-2 text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                      Account
+                    </div>
+                    <Link
+                      href="/dashboard/user"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center px-4 py-3 rounded-lg transition-colors hover:bg-accent text-foreground"
+                    >
+                      <User className="mr-3 h-5 w-5" />
+                      <span className="text-base font-medium">User Dashboard</span>
+                    </Link>
+                    <Link
+                      href="/dashboard/agent"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center px-4 py-3 rounded-lg transition-colors hover:bg-accent text-foreground"
+                    >
+                      <Building2 className="mr-3 h-5 w-5" />
+                      <span className="text-base font-medium">Agent Dashboard</span>
+                    </Link>
+                    <Link
+                      href="/dashboard/admin"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center px-4 py-3 rounded-lg transition-colors hover:bg-accent text-foreground"
+                    >
+                      <Shield className="mr-3 h-5 w-5" />
+                      <span className="text-base font-medium">Admin Panel</span>
+                    </Link>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+
+            {/* Logo - Visible on all screens */}
             <Link href="/" className="flex items-center space-x-2 group">
               {/* Logo */}
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#C62828] shadow-sm transition-transform duration-300 group-hover:scale-110">
@@ -82,15 +209,16 @@ export function Navigation() {
               <span className="text-2xl font-bold text-primary">Toplix</span>
             </Link>
 
-            <div className="flex items-center space-x-2">
+            {/* Desktop Navigation Links - Hidden on mobile */}
+            <div className="hidden md:flex items-center space-x-2 ml-4">
               <Link href="/buy">
                 <Button
                   variant="ghost"
                   className={cn(
-                    "hidden sm:flex transition-colors",
+                    "transition-all duration-200 font-medium",
                     pathname.includes('/buy') 
-                      ? "bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/30 dark:text-red-400" 
-                      : "hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                      ? "bg-blue-100 hover:bg-blue-200 text-blue-700 shadow-md" 
+                      : "hover:bg-blue-50 hover:text-blue-600"
                   )}
                 >
                   Buy
@@ -100,10 +228,10 @@ export function Navigation() {
                 <Button
                   variant="ghost"
                   className={cn(
-                    "hidden sm:flex transition-colors",
+                    "transition-all duration-200 font-medium",
                     pathname.includes('/rent') 
-                      ? "bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/30 dark:text-red-400" 
-                      : "hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                      ? "bg-blue-100 hover:bg-blue-200 text-blue-700 shadow-md" 
+                      : "hover:bg-blue-50 hover:text-blue-400"
                   )}
                 >
                   Rent
@@ -112,12 +240,13 @@ export function Navigation() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Desktop Login Button - Hidden on mobile */}
+          <div className="hidden md:flex items-center gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="gap-2">
                   <LogIn className="h-4 w-4" />
-                  <span className="hidden sm:inline">Login</span>
+                  <span>Login</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">

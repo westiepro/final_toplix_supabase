@@ -7,7 +7,7 @@ import { Property } from '@/types/property'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Map as MapIcon, Satellite, MapPin, Bed, Bath, Square, Share2, Heart, X, Plus, Minus } from 'lucide-react'
+import { Map as MapIcon, Satellite, MapPin, Bed, Bath, Square, Share2, Heart, X, Plus, Minus, ChevronLeft, ChevronRight } from 'lucide-react'
 import Image from 'next/image'
 
 // Format price based on listing type
@@ -70,6 +70,7 @@ export const PropertyMap = forwardRef<PropertyMapRef, PropertyMapProps>(
     const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
     const [mapStyle, setMapStyle] = useState<'map' | 'satellite'>('map')
     const [isFavorited, setIsFavorited] = useState(false)
+    const [popupImageIndex, setPopupImageIndex] = useState(0)
     const mapRef = useRef<any>(null)
 
   useImperativeHandle(ref, () => ({
@@ -165,6 +166,14 @@ export const PropertyMap = forwardRef<PropertyMapRef, PropertyMapProps>(
       }
     }, [selectedProperty])
 
+    useEffect(() => {
+      if (selectedProperty) {
+        // Reset favorite state and image index when property changes
+        setIsFavorited(false)
+        setPopupImageIndex(0)
+      }
+    }, [selectedProperty])
+
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
 
   if (!mapboxToken) {
@@ -236,7 +245,7 @@ export const PropertyMap = forwardRef<PropertyMapRef, PropertyMapProps>(
       </div>
 
       {/* Zoom Controls */}
-      <div className="absolute top-4 right-4 z-10">
+      <div className="absolute top-20 right-4 z-10">
         <div className="bg-white rounded-lg border border-gray-200 shadow-lg overflow-hidden">
           <button
             type="button"
@@ -301,19 +310,6 @@ export const PropertyMap = forwardRef<PropertyMapRef, PropertyMapProps>(
                      className="!p-0"
                    >
                      <div className="relative">
-                       {/* Custom Close Button */}
-                       <button
-                         onClick={(e) => {
-                           e.preventDefault()
-                           e.stopPropagation()
-                           setSelectedProperty(null)
-                         }}
-                         className="absolute top-2 right-2 z-20 p-1.5 rounded-full bg-gray-500/50 hover:bg-gray-500/60 transition-all"
-                         aria-label="Close popup"
-                       >
-                         <X className="h-5 w-5 text-white" />
-                       </button>
-                       
                        <Link 
                          href={`/property/${selectedProperty.id}`}
                          className="block no-underline"
@@ -322,33 +318,82 @@ export const PropertyMap = forwardRef<PropertyMapRef, PropertyMapProps>(
                            e.stopPropagation()
                          }}
                        >
-                       <Card className="w-64 cursor-pointer hover:shadow-lg transition-shadow pt-0 pb-0 gap-0 h-full">
+                       <Card className="w-80 cursor-pointer hover:shadow-lg transition-shadow pt-0 pb-0 gap-0 h-full">
                          <CardContent className="p-0 h-full flex flex-col">
-                           {/* Image */}
-                           <div className="relative h-36 w-full overflow-hidden rounded-t-lg bg-muted flex-shrink-0">
-                             {selectedProperty.images && selectedProperty.images.length > 0 ? (
-                               <Image
-                                 src={selectedProperty.images[0]}
-                                 alt={selectedProperty.title}
-                                 fill
-                                 className="object-cover"
-                               />
-                             ) : (
-                               <div className="flex h-full items-center justify-center text-muted-foreground text-xs">
-                                 No Image
-                               </div>
-                             )}
-                           </div>
+                          {/* Image */}
+                          <div className="relative h-44 w-full overflow-hidden rounded-t-lg bg-muted flex-shrink-0 group">
+                            {selectedProperty.images && selectedProperty.images.length > 0 ? (
+                              <>
+                                <Image
+                                  src={selectedProperty.images[popupImageIndex] || selectedProperty.images[0]}
+                                  alt={`${selectedProperty.title} - Image ${popupImageIndex + 1}`}
+                                  fill
+                                  className="object-cover"
+                                />
+                                {selectedProperty.images.length > 1 && (
+                                  <>
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        setPopupImageIndex((prev) => 
+                                          prev === 0 ? selectedProperty.images.length - 1 : prev - 1
+                                        )
+                                      }}
+                                      className="absolute left-2 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-gray-500/50 hover:bg-gray-500/60 transition-all opacity-0 group-hover:opacity-100"
+                                      aria-label="Previous image"
+                                    >
+                                      <ChevronLeft className="h-4 w-4 text-white" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        setPopupImageIndex((prev) => 
+                                          prev === selectedProperty.images.length - 1 ? 0 : prev + 1
+                                        )
+                                      }}
+                                      className="absolute right-2 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-gray-500/50 hover:bg-gray-500/60 transition-all opacity-0 group-hover:opacity-100"
+                                      aria-label="Next image"
+                                    >
+                                      <ChevronRight className="h-4 w-4 text-white" />
+                                    </button>
+                                    {popupImageIndex > 0 && (
+                                      <div className="absolute bottom-2 left-2 z-20 px-2 py-1 rounded-md bg-black/60 text-white text-xs font-medium">
+                                        {popupImageIndex + 1} / {selectedProperty.images.length}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </>
+                            ) : (
+                              <div className="flex h-full items-center justify-center text-muted-foreground text-xs">
+                                No Image
+                              </div>
+                            )}
+                            {/* Custom Close Button - Top Right Corner */}
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setSelectedProperty(null)
+                              }}
+                              className="absolute top-2 right-2 z-30 p-1.5 rounded-full bg-gray-500/50 hover:bg-gray-500/60 transition-all"
+                              aria-label="Close popup"
+                            >
+                              <X className="h-5 w-5 text-white" />
+                            </button>
+                          </div>
                            
                            {/* Content - Stretch to fill remaining space */}
                            <div className="px-3 pt-2 pb-2 flex-1 flex flex-col justify-between">
                              <div>
                                {/* Price and action icons */}
                                <div className="flex items-center justify-between mb-1.5">
-                                 <p className="text-xl font-bold text-blue-600">
+                                 <p className="text-xl font-bold text-black">
                                    €{selectedProperty.price.toLocaleString()}
                                  </p>
-                                 <div className="flex items-center gap-1.5">
+                                 <div className="flex items-center gap-2">
                                    <button
                                      onClick={(e) => {
                                        e.preventDefault()
@@ -366,10 +411,10 @@ export const PropertyMap = forwardRef<PropertyMapRef, PropertyMapProps>(
                                          }).catch(() => {})
                                        }
                                      }}
-                                     className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                                     className="p-1.5 rounded-full hover:bg-gray-100 transition-colors"
                                      aria-label="Share property"
                                    >
-                                     <Share2 className="h-4 w-4 text-gray-600" />
+                                     <Share2 className="h-5 w-5 text-gray-600" />
                                    </button>
                                    <button
                                      onClick={(e) => {
@@ -377,11 +422,11 @@ export const PropertyMap = forwardRef<PropertyMapRef, PropertyMapProps>(
                                        e.stopPropagation()
                                        setIsFavorited((prev) => !prev)
                                      }}
-                                     className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                                     className="p-1.5 rounded-full hover:bg-gray-100 transition-colors"
                                      aria-label="Add to favorites"
                                    >
                                      <Heart 
-                                       className={`h-4 w-4 transition-colors ${
+                                       className={`h-5 w-5 transition-colors ${
                                          isFavorited ? 'fill-red-500 text-red-500' : 'text-gray-600'
                                        }`} 
                                      />
@@ -389,15 +434,14 @@ export const PropertyMap = forwardRef<PropertyMapRef, PropertyMapProps>(
                                  </div>
                                </div>
                                
-                               <h3 className="font-semibold text-sm mb-1 line-clamp-1">
+                               <h3 className="font-semibold text-base mb-1 line-clamp-1">
                                  {selectedProperty.title}
                                </h3>
                                
-                               {/* Location - only city with flag */}
-                               <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1.5">
-                                 <MapPin className="h-3 w-3" />
+                               {/* Location - only city */}
+                               <div className="flex items-center gap-1 text-base text-muted-foreground mb-1.5">
+                                 <MapPin className="h-4 w-4" />
                                  <span>{selectedProperty.city}</span>
-                                 <span className="text-sm">🇵🇹</span>
                                </div>
                              </div>
                              
@@ -406,23 +450,23 @@ export const PropertyMap = forwardRef<PropertyMapRef, PropertyMapProps>(
                                <div className="border-t border-gray-200 my-1.5"></div>
                                
                                {/* Property details */}
-                               <div className="flex items-center gap-3 text-sm">
-                                 <div className="flex items-center gap-1">
-                                   <Bed className="h-4 w-4 text-muted-foreground" />
-                                   <span className="font-medium text-xs">{selectedProperty.bedrooms}</span>
+                               <div className="flex items-center gap-4 text-lg">
+                                 <div className="flex items-center gap-2">
+                                   <Bed className="h-6 w-6 text-muted-foreground" />
+                                   <span className="font-medium">{selectedProperty.bedrooms}</span>
                                  </div>
-                                 <div className="flex items-center gap-1">
-                                   <Bath className="h-4 w-4 text-muted-foreground" />
-                                   <span className="font-medium text-xs">{selectedProperty.bathrooms}</span>
+                                 <div className="flex items-center gap-2">
+                                   <Bath className="h-6 w-6 text-muted-foreground" />
+                                   <span className="font-medium">{selectedProperty.bathrooms}</span>
                                  </div>
-                                 <div className="flex items-center gap-1">
-                                   <Square className="h-4 w-4 text-muted-foreground" />
-                                   <span className="font-medium text-xs">{selectedProperty.area} m²</span>
+                                 <div className="flex items-center gap-2">
+                                   <Square className="h-6 w-6 text-muted-foreground" />
+                                   <span className="font-medium">{selectedProperty.area} m²</span>
                                  </div>
                                  
                                  {/* Property type at bottom right */}
                                  <div className="ml-auto">
-                                   <span className="text-xs font-medium capitalize">{selectedProperty.property_type}</span>
+                                   <span className="text-sm font-medium capitalize">{selectedProperty.property_type}</span>
                                  </div>
                                </div>
                              </div>
@@ -446,12 +490,43 @@ export async function geocodeCity(city: string): Promise<[number, number] | null
 
   try {
     // Search for places in Portugal (PT) and Spain (ES) only
+    // Remove types restriction to find all location types including Vilamoura
     const response = await fetch(
-      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(city)}.json?access_token=${mapboxToken}&country=pt,es&types=place&limit=1`
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(city)}.json?access_token=${mapboxToken}&country=pt,es&autocomplete=false&limit=5`
     )
     const data = await response.json()
+    
+    // Manual fallback for Vilamoura if not in results
+    if (city.toLowerCase().includes('vilamoura') && !data.features?.some((f: any) => 
+      f.place_name.toLowerCase().includes('vilamoura') && 
+      f.context?.some((ctx: any) => ctx.id.startsWith('country.pt'))
+    )) {
+      // Return Vilamoura coordinates directly
+      return [-8.1173454, 37.0902287] // Vilamoura, Portugal coordinates (corrected)
+    }
+    
     if (data.features && data.features.length > 0) {
-      const [lng, lat] = data.features[0].center
+      // Filter to find the best match (prefer place, locality, neighborhood, poi over addresses)
+      // Prioritize Portugal results
+      const filteredFeatures = data.features.filter((feature: any) => {
+        const featureType = feature.place_type?.[0] || ''
+        return ['place', 'locality', 'neighborhood', 'poi'].includes(featureType)
+      })
+      
+      // Sort: Portugal first, then by relevance
+      const sortedFeatures = filteredFeatures.sort((a: any, b: any) => {
+        const aCountry = a.context?.find((ctx: any) => ctx.id.startsWith('country'))?.short_code || ''
+        const bCountry = b.context?.find((ctx: any) => ctx.id.startsWith('country'))?.short_code || ''
+        
+        if (aCountry === 'pt' && bCountry !== 'pt') return -1
+        if (bCountry === 'pt' && aCountry !== 'pt') return 1
+        
+        return (b.relevance || 0) - (a.relevance || 0)
+      })
+      
+      const bestMatch = sortedFeatures[0] || data.features[0] // Fallback to first result if no match
+      
+      const [lng, lat] = bestMatch.center
       return [lng, lat]
     }
   } catch (error) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef, useEffect, memo } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/popover'
 import { Slider } from '@/components/ui/slider'
 import { Label } from '@/components/ui/label'
-import { Search, Save, X, Filter, Home, Building2, Building } from 'lucide-react'
+import { Search, Save, X, Filter, Home, Building2, Building, ChevronDown, SlidersHorizontal } from 'lucide-react'
 import { PropertyType, Property } from '@/types/property'
 import { FilterSidebar } from '@/components/filter-sidebar'
 
@@ -40,6 +40,7 @@ interface PropertyFiltersProps {
 
 export interface FilterState {
   city: string
+  country?: string
   minPrice: number
   maxPrice: number
   propertyType: PropertyType | 'all'
@@ -53,7 +54,7 @@ export interface FilterState {
 const defaultFilters: FilterState = {
   city: '',
   minPrice: 0,
-  maxPrice: 2000000,
+  maxPrice: 5000000,
   propertyType: 'all',
   bedrooms: 'all',
   bathrooms: 'all',
@@ -78,15 +79,18 @@ function PropertyFiltersComponent({
   // Internal state - completely independent
   const [filters, setFilters] = useState<FilterState>(defaultFilters)
   const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false)
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000000])
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 5000000])
   const [priceMinInput, setPriceMinInput] = useState<string>('')
   const [priceMaxInput, setPriceMaxInput] = useState<string>('')
   const [isPricePopoverOpen, setIsPricePopoverOpen] = useState(false)
   const [isBedBathPopoverOpen, setIsBedBathPopoverOpen] = useState(false)
   const [isPropertyTypePopoverOpen, setIsPropertyTypePopoverOpen] = useState(false)
+  const [isAreaPopoverOpen, setIsAreaPopoverOpen] = useState(false)
   const [selectedBeds, setSelectedBeds] = useState<number[]>([])
   const [selectedBaths, setSelectedBaths] = useState<number[]>([])
   const [areaRange, setAreaRange] = useState<[number, number]>([0, 500])
+  const [areaMinInput, setAreaMinInput] = useState<string>('')
+  const [areaMaxInput, setAreaMaxInput] = useState<string>('')
   const [cityInput, setCityInput] = useState('')
   const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -122,13 +126,38 @@ function PropertyFiltersComponent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.city])
 
+  // Helper function to format number with commas
+  const formatPrice = useCallback((value: number): string => {
+    if (value === 0) return ''
+    return value.toLocaleString('en-US')
+  }, [])
+
+  // Helper function to format price for display (K/M notation)
+  const formatPriceDisplay = useCallback((value: number): string => {
+    if (value >= 1000000) {
+      const millions = value / 1000000
+      return millions % 1 === 0 ? `${millions}M` : `${millions.toFixed(1)}M`
+    } else if (value >= 1000) {
+      const thousands = value / 1000
+      return thousands % 1 === 0 ? `${thousands}K` : `${thousands.toFixed(1)}K`
+    }
+    return value.toString()
+  }, [])
+
+  // Helper function to parse formatted string to number
+  const parsePrice = useCallback((value: string): number => {
+    // Remove all non-digit characters
+    const cleaned = value.replace(/\D/g, '')
+    return cleaned ? parseInt(cleaned, 10) : 0
+  }, [])
+
   // Sync price inputs with priceRange
   useEffect(() => {
     if (!isPricePopoverOpen) {
-      setPriceMinInput(priceRange[0] === 0 ? '' : priceRange[0].toString())
-      setPriceMaxInput(priceRange[1] === 2000000 ? '' : priceRange[1].toString())
+      setPriceMinInput(priceRange[0] === 0 ? '' : formatPrice(priceRange[0]))
+      setPriceMaxInput(priceRange[1] === 5000000 ? '' : formatPrice(priceRange[1]))
     }
-  }, [priceRange, isPricePopoverOpen])
+  }, [priceRange, isPricePopoverOpen, formatPrice])
 
   // Sync bed/bath selections with filters
   useEffect(() => {
@@ -220,13 +249,53 @@ function PropertyFiltersComponent({
 
     try {
       // Search for places in Portugal (PT) and Spain (ES) only
+      // Remove types restriction to include all location types (cities, localities, neighborhoods, POIs)
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&country=pt,es&types=place&limit=8`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&country=pt,es&autocomplete=false&limit=10`
       )
       const data = await response.json()
       
+      // Manual fallback for Vilamoura if not in results
+      if (query.toLowerCase().includes('vilamoura') && !data.features?.some((f: any) => 
+        f.place_name.toLowerCase().includes('vilamoura') && 
+        f.context?.some((ctx: any) => ctx.id.startsWith('country.pt'))
+      )) {
+        // Add Vilamoura manually
+        data.features = data.features || []
+        data.features.unshift({
+          place_name: 'Vilamoura, Faro, Portugal',
+          center: [-8.1173454, 37.0902287], // Vilamoura coordinates (corrected)
+          place_type: ['locality'],
+          context: [
+            { id: 'country.pt', text: 'Portugal', short_code: 'pt' },
+            { id: 'region.pt', text: 'Algarve' }
+          ],
+          relevance: 1.0
+        })
+      }
+      
       if (data.features && data.features.length > 0) {
-        const suggestions: CitySuggestion[] = data.features.map((feature: any) => ({
+        // Filter to only include place, locality, neighborhood, and poi types
+        // This excludes addresses and other specific location types
+        const filteredFeatures = data.features.filter((feature: any) => {
+          const featureType = feature.place_type?.[0] || ''
+          return ['place', 'locality', 'neighborhood', 'poi'].includes(featureType)
+        })
+        
+        // Sort results: Portugal first, then by relevance
+        const sortedFeatures = filteredFeatures.sort((a: any, b: any) => {
+          const aCountry = a.context?.find((ctx: any) => ctx.id.startsWith('country'))?.short_code || ''
+          const bCountry = b.context?.find((ctx: any) => ctx.id.startsWith('country'))?.short_code || ''
+          
+          // Prioritize Portugal (pt) over Spain (es)
+          if (aCountry === 'pt' && bCountry !== 'pt') return -1
+          if (bCountry === 'pt' && aCountry !== 'pt') return 1
+          
+          // Then sort by relevance score (higher is better)
+          return (b.relevance || 0) - (a.relevance || 0)
+        })
+        
+        const suggestions: CitySuggestion[] = sortedFeatures.map((feature: any) => ({
           name: feature.place_name.split(',')[0], // Get just the city name
           country: feature.context?.find((ctx: any) => ctx.id.startsWith('country'))?.text || '',
           coordinates: feature.center as [number, number],
@@ -275,7 +344,7 @@ function PropertyFiltersComponent({
     setCitySuggestions([])
     
     setFilters((prev) => {
-      const newFilters = { ...prev, city: suggestion.name }
+      const newFilters = { ...prev, city: suggestion.name, country: suggestion.country }
       // Immediate city search for map navigation with coordinates
       onCitySearchRef.current(suggestion.name)
       // Debounced filter update
@@ -291,7 +360,7 @@ function PropertyFiltersComponent({
     setShowSuggestions(false)
     
     setFilters((prev) => {
-      const newFilters = { ...prev, city: '' }
+      const newFilters = { ...prev, city: '', country: undefined }
       notifyParent(newFilters)
       return newFilters
     })
@@ -302,6 +371,43 @@ function PropertyFiltersComponent({
     handleCityInputChange(value)
   }, [handleCityInputChange])
   
+  // Calculate price histogram
+  const histogramData = useMemo(() => {
+    if (!properties || properties.length === 0) return []
+    
+    const minPrice = 0
+    const maxPrice = 5000000
+    const bucketCount = 20 // Number of bars in the histogram
+    const bucketSize = (maxPrice - minPrice) / bucketCount
+    
+    const buckets = Array.from({ length: bucketCount }, () => 0)
+    
+    properties.forEach((property) => {
+      const bucketIndex = Math.min(
+        Math.floor((property.price - minPrice) / bucketSize),
+        bucketCount - 1
+      )
+      if (bucketIndex >= 0) {
+        buckets[bucketIndex]++
+      }
+    })
+    
+    const maxCount = Math.max(...buckets, 1) // Avoid division by zero
+    
+    return buckets.map((count, index) => {
+      const bucketStart = minPrice + (index * bucketSize)
+      const bucketEnd = minPrice + ((index + 1) * bucketSize)
+      // Check if this bucket overlaps with the selected price range
+      const isInRange = bucketStart < priceRange[1] && bucketEnd > priceRange[0]
+      
+      return {
+        count,
+        height: (count / maxCount) * 100, // Percentage height
+        isInRange,
+      }
+    })
+  }, [properties, priceRange])
+
   // Custom step function to snap values to correct steps
   const snapToStep = useCallback((value: number) => {
     if (value < 1000000) {
@@ -334,46 +440,84 @@ function PropertyFiltersComponent({
   }, [snapToStep])
 
   const handlePriceMinInputChange = useCallback((value: string) => {
-    setPriceMinInput(value)
-    const numValue = parseInt(value) || 0
-    const clampedValue = Math.max(0, Math.min(numValue, priceRange[1]))
-    const snappedValue = snapToStep(clampedValue)
-    const newRange: [number, number] = [snappedValue, priceRange[1]]
-    setPriceRange(newRange)
-    setFilters((prev) => {
-      const newFilters = { ...prev, minPrice: snappedValue, maxPrice: priceRange[1] }
-      // Defer parent update to avoid setState during render
-      setTimeout(() => {
-        onFiltersChangeRef.current(newFilters)
-      }, 0)
-      return newFilters
-    })
+    // Remove all non-digit characters and format with commas
+    const cleaned = value.replace(/\D/g, '')
+    const numValue = cleaned ? parseInt(cleaned, 10) : 0
+    
+    // Format the display value with commas
+    const formatted = cleaned.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+    setPriceMinInput(formatted)
+    
+    if (numValue > 0) {
+      const clampedValue = Math.max(0, Math.min(numValue, priceRange[1]))
+      const snappedValue = snapToStep(clampedValue)
+      const newRange: [number, number] = [snappedValue, priceRange[1]]
+      setPriceRange(newRange)
+      setFilters((prev) => {
+        const newFilters = { ...prev, minPrice: snappedValue, maxPrice: priceRange[1] }
+        // Defer parent update to avoid setState during render
+        setTimeout(() => {
+          onFiltersChangeRef.current(newFilters)
+        }, 0)
+        return newFilters
+      })
+    } else if (cleaned === '') {
+      // Empty value
+      const newRange: [number, number] = [0, priceRange[1]]
+      setPriceRange(newRange)
+      setFilters((prev) => {
+        const newFilters = { ...prev, minPrice: 0, maxPrice: priceRange[1] }
+        setTimeout(() => {
+          onFiltersChangeRef.current(newFilters)
+        }, 0)
+        return newFilters
+      })
+    }
   }, [priceRange, snapToStep])
 
   const handlePriceMaxInputChange = useCallback((value: string) => {
-    setPriceMaxInput(value)
-    const numValue = parseInt(value) || 0
-    const clampedValue = Math.max(priceRange[0], Math.min(numValue, 5000000))
-    const snappedValue = snapToStep(clampedValue)
-    const newRange: [number, number] = [priceRange[0], snappedValue]
-    setPriceRange(newRange)
-    setFilters((prev) => {
-      const newFilters = { ...prev, minPrice: priceRange[0], maxPrice: snappedValue }
-      // Defer parent update to avoid setState during render
-      setTimeout(() => {
-        onFiltersChangeRef.current(newFilters)
-      }, 0)
-      return newFilters
-    })
+    // Remove all non-digit characters and format with commas
+    const cleaned = value.replace(/\D/g, '')
+    const numValue = cleaned ? parseInt(cleaned, 10) : 0
+    
+    // Format the display value with commas
+    const formatted = cleaned.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+    setPriceMaxInput(formatted)
+    
+    if (numValue > 0) {
+      const clampedValue = Math.max(priceRange[0], Math.min(numValue, 5000000))
+      const snappedValue = snapToStep(clampedValue)
+      const newRange: [number, number] = [priceRange[0], snappedValue]
+      setPriceRange(newRange)
+      setFilters((prev) => {
+        const newFilters = { ...prev, minPrice: priceRange[0], maxPrice: snappedValue }
+        // Defer parent update to avoid setState during render
+        setTimeout(() => {
+          onFiltersChangeRef.current(newFilters)
+        }, 0)
+        return newFilters
+      })
+    } else if (cleaned === '') {
+      // Empty value
+      const newRange: [number, number] = [priceRange[0], 5000000]
+      setPriceRange(newRange)
+      setFilters((prev) => {
+        const newFilters = { ...prev, minPrice: priceRange[0], maxPrice: 5000000 }
+        setTimeout(() => {
+          onFiltersChangeRef.current(newFilters)
+        }, 0)
+        return newFilters
+      })
+    }
   }, [priceRange, snapToStep])
 
   const handlePriceReset = useCallback(() => {
-    const defaultRange: [number, number] = [0, 2000000]
+    const defaultRange: [number, number] = [0, 5000000]
     setPriceRange(defaultRange)
     setPriceMinInput('')
     setPriceMaxInput('')
     setFilters((prev) => {
-      const newFilters = { ...prev, minPrice: 0, maxPrice: 2000000 }
+      const newFilters = { ...prev, minPrice: 0, maxPrice: 5000000 }
       // Defer parent update to avoid setState during render
       setTimeout(() => {
         onFiltersChangeRef.current(newFilters)
@@ -386,6 +530,54 @@ function PropertyFiltersComponent({
     setIsPricePopoverOpen(false)
   }, [])
   
+  // Sync area inputs with range
+  useEffect(() => {
+    setAreaMinInput(areaRange[0] === 0 ? '' : areaRange[0].toString())
+    setAreaMaxInput(areaRange[1] === 500 ? '' : areaRange[1].toString())
+  }, [areaRange])
+
+  const handleAreaMinInputChange = useCallback((value: string) => {
+    setAreaMinInput(value)
+    const numValue = parseInt(value) || 0
+    const clampedValue = Math.max(0, Math.min(numValue, areaRange[1]))
+    const newRange: [number, number] = [clampedValue, areaRange[1]]
+    setAreaRange(newRange)
+    setFilters((prev) => {
+      const newFilters = { ...prev, minArea: clampedValue, maxArea: areaRange[1] }
+      notifyParent(newFilters)
+      return newFilters
+    })
+  }, [areaRange, notifyParent])
+
+  const handleAreaMaxInputChange = useCallback((value: string) => {
+    setAreaMaxInput(value)
+    const numValue = parseInt(value) || 0
+    const clampedValue = Math.max(areaRange[0], Math.min(numValue, 500))
+    const newRange: [number, number] = [areaRange[0], clampedValue]
+    setAreaRange(newRange)
+    setFilters((prev) => {
+      const newFilters = { ...prev, minArea: areaRange[0], maxArea: clampedValue }
+      notifyParent(newFilters)
+      return newFilters
+    })
+  }, [areaRange, notifyParent])
+
+  const handleAreaReset = useCallback(() => {
+    const defaultRange: [number, number] = [0, 500]
+    setAreaRange(defaultRange)
+    setAreaMinInput('')
+    setAreaMaxInput('')
+    setFilters((prev) => {
+      const newFilters = { ...prev, minArea: 0, maxArea: 500 }
+      notifyParent(newFilters)
+      return newFilters
+    })
+  }, [notifyParent])
+
+  const handleAreaDone = useCallback(() => {
+    setIsAreaPopoverOpen(false)
+  }, [])
+
   const handleAreaChange = useCallback((values: number[]) => {
     setAreaRange([values[0], values[1]] as [number, number])
     setFilters((prev) => {
@@ -404,6 +596,18 @@ function PropertyFiltersComponent({
       return newFilters
     })
   }, [notifyParent])
+
+  const handlePropertyTypeReset = useCallback(() => {
+    setFilters((prev) => {
+      const newFilters = { ...prev, propertyType: 'all' }
+      notifyParent(newFilters)
+      return newFilters
+    })
+  }, [notifyParent])
+
+  const handlePropertyTypeDone = useCallback(() => {
+    setIsPropertyTypePopoverOpen(false)
+  }, [])
   
   const handleBedroomsChange = useCallback((value: string) => {
     const newValue: number | 'all' = value === 'all' ? 'all' : parseInt(value)
@@ -526,12 +730,14 @@ function PropertyFiltersComponent({
     setCityInput('')
     setCitySuggestions([])
     setShowSuggestions(false)
-    setPriceRange([0, 2000000] as [number, number])
+    setPriceRange([0, 5000000] as [number, number])
     setPriceMinInput('')
     setPriceMaxInput('')
     setSelectedBeds([])
     setSelectedBaths([])
     setAreaRange([0, 500] as [number, number])
+    setAreaMinInput('')
+    setAreaMaxInput('')
     lastNotifiedRef.current = ''
     notifyParent(cleared)
   }, [notifyParent])
@@ -541,13 +747,17 @@ function PropertyFiltersComponent({
   }, [clearFilters])
   
   return (
-    <div className="w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto px-4 py-4">
-        <div className="flex flex-wrap items-center gap-4">
+    <div className="w-full border-b-2 border-gray-300 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
+      <div className="container mx-auto px-4 py-6">
+        <div className="flex flex-wrap items-center gap-3">
           {/* City Search with Dropdown */}
           <div className="w-[280px] relative">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground z-10" />
+              <div className="absolute left-2 top-1/2 -translate-y-1/2 z-10 pointer-events-none flex items-center justify-center">
+                <div className="bg-blue-50 rounded-md p-1.5 border border-blue-200">
+                  <Search className="h-4 w-4 text-blue-600" />
+                </div>
+              </div>
               <Input
                 ref={inputRef}
                 placeholder="Search for city (Portugal & Spain)"
@@ -570,7 +780,7 @@ function PropertyFiltersComponent({
                   // Delay to allow click on suggestion
                   setTimeout(() => setShowSuggestions(false), 200)
                 }}
-                className="pl-10 pr-10"
+                className="pl-14 pr-10 h-11 text-base border-2 border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 shadow-sm hover:shadow-md focus:shadow-md transition-all duration-200 bg-white"
               />
               {cityInput && (
                 <button
@@ -581,7 +791,7 @@ function PropertyFiltersComponent({
                     handleCityReset()
                     inputRef.current?.focus()
                   }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-1 rounded-full bg-gray-500/50 hover:bg-gray-500/60 transition-all"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-1.5 rounded-full bg-gray-500/70 hover:bg-gray-600/80 transition-all shadow-sm hover:shadow-md"
                   aria-label="Clear city search"
                 >
                   <X className="h-4 w-4 text-white" />
@@ -593,7 +803,7 @@ function PropertyFiltersComponent({
           {/* Render dropdown in portal to appear above everything */}
           {typeof window !== 'undefined' && showSuggestions && citySuggestions.length > 0 && inputPosition && createPortal(
             <div
-              className="fixed bg-popover border rounded-md shadow-lg z-[9999] max-h-60 overflow-y-auto"
+              className="fixed bg-white border-2 border-gray-200 rounded-lg shadow-xl z-[9999] max-h-60 overflow-y-auto mt-1"
               style={{
                 top: `${inputPosition.top + 4}px`,
                 left: `${inputPosition.left}px`,
@@ -605,10 +815,10 @@ function PropertyFiltersComponent({
                   key={index}
                   type="button"
                   onClick={() => handleCitySelect(suggestion)}
-                  className="w-full text-left px-4 py-2 hover:bg-accent hover:text-accent-foreground transition-colors border-b last:border-b-0"
+                  className="w-full text-left px-4 py-3 hover:bg-blue-50 hover:text-blue-700 transition-colors border-b border-gray-100 last:border-b-0 first:rounded-t-lg last:rounded-b-lg"
                 >
-                  <div className="font-medium">{suggestion.name}</div>
-                  <div className="text-xs text-muted-foreground">{suggestion.country}</div>
+                  <div className="font-medium text-sm">{suggestion.name}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{suggestion.country}</div>
                 </button>
               ))}
             </div>,
@@ -617,24 +827,89 @@ function PropertyFiltersComponent({
 
           {/* Price Range */}
           <Popover open={isPricePopoverOpen} onOpenChange={setIsPricePopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="min-w-[220px] justify-between">
-                {priceRange[0] === 0 && priceRange[1] === 2000000
-                  ? 'Price'
-                  : `€${priceRange[0].toLocaleString()} - €${priceRange[1].toLocaleString()}`}
-              </Button>
-            </PopoverTrigger>
+            <div className="relative inline-block">
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className={`min-w-[160px] h-11 justify-between text-base font-medium shadow-sm hover:shadow-md transition-all border-2 ${
+                    priceRange[0] !== 0 || priceRange[1] !== 5000000
+                      ? 'border-blue-500 bg-blue-50/50 hover:bg-blue-50'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                  onClick={(e) => {
+                    // If clicking on X icon, don't open popover
+                    const target = e.target as HTMLElement
+                    if (target.closest('svg') || target.closest('.reset-x')) {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      return
+                    }
+                  }}
+                >
+                  <span>
+                    {priceRange[0] === 0 && priceRange[1] === 5000000
+                      ? 'Price'
+                      : priceRange[0] > 0 && priceRange[1] === 5000000
+                      ? `Min €${formatPriceDisplay(priceRange[0])}`
+                      : priceRange[0] === 0 && priceRange[1] < 5000000
+                      ? `Max €${formatPriceDisplay(priceRange[1])}`
+                      : `€${formatPriceDisplay(priceRange[0])} - €${formatPriceDisplay(priceRange[1])}`}
+                  </span>
+                  {priceRange[0] !== 0 || priceRange[1] !== 5000000 ? (
+                    <X 
+                      className="h-5 w-5 text-blue-600 hover:text-blue-700 cursor-pointer reset-x rounded p-0.5 hover:bg-blue-100 transition-colors" 
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setIsPricePopoverOpen(false)
+                        handlePriceReset()
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                    />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 opacity-50" />
+                  )}
+                </Button>
+              </PopoverTrigger>
+            </div>
             <PopoverContent className="w-96">
               <div className="space-y-4">
                 <Label>Price Range</Label>
-                <Slider
-                  value={priceRange}
-                  onValueChange={handlePriceChange}
-                  min={0}
-                  max={5000000}
-                  step={50000}
-                  className="w-full"
-                />
+                
+                {/* Histogram and Slider Container */}
+                <div className="relative w-full mb-2">
+                  {/* Histogram */}
+                  <div className="relative w-full h-16 mb-2 flex items-end justify-between">
+                    {histogramData.map((bar, index) => (
+                      <div
+                        key={index}
+                        className={`flex-1 rounded-t-sm transition-all duration-200 hover:opacity-80 ${
+                          bar.isInRange ? 'bg-blue-300' : 'bg-gray-300'
+                        }`}
+                        style={{
+                          height: `${Math.max(bar.height, 2)}%`,
+                          minHeight: '2px',
+                          marginRight: index < histogramData.length - 1 ? '2px' : '0',
+                        }}
+                        title={`${bar.count} properties`}
+                      />
+                    ))}
+                  </div>
+                  
+                  {/* Slider */}
+                  <Slider
+                    value={priceRange}
+                    onValueChange={handlePriceChange}
+                    min={0}
+                    max={5000000}
+                    step={50000}
+                    className="w-full [&_[data-slot=slider-thumb]]:size-6 [&_[data-slot=slider-thumb]]:border-2 [&_[data-slot=slider-range]]:bg-blue-500 [&_[data-slot=slider-thumb]]:border-blue-500"
+                  />
+                </div>
+                
                 <div className="flex justify-between text-sm text-muted-foreground">
                   <span>€{priceRange[0].toLocaleString()}</span>
                   <span>€{priceRange[1].toLocaleString()}</span>
@@ -642,24 +917,32 @@ function PropertyFiltersComponent({
                 
                 {/* Min/Max Input Fields */}
                 <div className="flex items-center gap-2">
-                  <div className="flex-1">
+                  <div className="flex-1 relative">
                     <Input
-                      type="number"
+                      type="text"
                       placeholder="Enter min"
                       value={priceMinInput}
                       onChange={(e) => handlePriceMinInputChange(e.target.value)}
-                      className="w-full"
+                      onWheel={(e) => e.currentTarget.blur()}
+                      className="w-full pl-6"
                     />
+                    {priceMinInput && (
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">€</span>
+                    )}
                   </div>
                   <span className="text-muted-foreground">-</span>
-                  <div className="flex-1">
+                  <div className="flex-1 relative">
                     <Input
-                      type="number"
+                      type="text"
                       placeholder="Enter max"
                       value={priceMaxInput}
                       onChange={(e) => handlePriceMaxInputChange(e.target.value)}
-                      className="w-full"
+                      onWheel={(e) => e.currentTarget.blur()}
+                      className="w-full pl-6"
                     />
+                    {priceMaxInput && (
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">€</span>
+                    )}
                   </div>
                 </div>
 
@@ -685,77 +968,164 @@ function PropertyFiltersComponent({
 
           {/* Property Type */}
           <Popover open={isPropertyTypePopoverOpen} onOpenChange={setIsPropertyTypePopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="min-w-[150px] justify-between">
-                {filters.propertyType === 'all' 
-                  ? 'Property Type' 
-                  : filters.propertyType.charAt(0).toUpperCase() + filters.propertyType.slice(1)}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80">
-              <div className="grid grid-cols-3 gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    handlePropertyTypeChange('all')
-                    setIsPropertyTypePopoverOpen(false)
-                  }}
-                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-colors ${
-                    filters.propertyType === 'all'
-                      ? 'bg-blue-50 border-blue-500 text-blue-700'
-                      : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
+            <div className="relative inline-block">
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className={`min-w-[150px] h-11 justify-between text-base font-medium shadow-sm hover:shadow-md transition-all border-2 ${
+                    filters.propertyType !== 'all'
+                      ? 'border-blue-500 bg-blue-50/50 hover:bg-blue-50'
+                      : 'border-gray-300 hover:border-gray-400'
                   }`}
+                  onClick={(e) => {
+                    // If clicking on X icon, don't open popover
+                    const target = e.target as HTMLElement
+                    if (target.closest('svg') || target.closest('.reset-x')) {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      return
+                    }
+                  }}
                 >
-                  <Building2 className="h-6 w-6 mb-1" />
-                  <span className="text-sm font-medium">All</span>
-                </button>
-                {(['house', 'apartment', 'condo', 'townhouse', 'villa'] as PropertyType[]).map((type) => {
-                  const Icon = propertyTypeIcons[type]
-                  return (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => {
-                        handlePropertyTypeChange(type)
+                  <span>
+                    {filters.propertyType === 'all' 
+                      ? 'Property Type' 
+                      : filters.propertyType.charAt(0).toUpperCase() + filters.propertyType.slice(1)}
+                  </span>
+                  {filters.propertyType !== 'all' ? (
+                    <X 
+                      className="h-5 w-5 text-blue-600 hover:text-blue-700 cursor-pointer reset-x rounded p-0.5 hover:bg-blue-100 transition-colors" 
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
                         setIsPropertyTypePopoverOpen(false)
+                        handlePropertyTypeReset()
                       }}
-                      className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-colors ${
-                        filters.propertyType === type
-                          ? 'bg-blue-50 border-blue-500 text-blue-700'
-                          : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
-                      }`}
-                    >
-                      <Icon className="h-6 w-6 mb-1" />
-                      <span className="text-sm font-medium capitalize">{type}</span>
-                    </button>
-                  )
-                })}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                    />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 opacity-50" />
+                  )}
+                </Button>
+              </PopoverTrigger>
+            </div>
+            <PopoverContent className="w-80">
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handlePropertyTypeChange('all')}
+                    className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-colors ${
+                      filters.propertyType === 'all'
+                        ? 'bg-blue-50 border-blue-500 text-blue-700'
+                        : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    <Building2 className="h-6 w-6 mb-1" />
+                    <span className="text-sm font-medium">All</span>
+                  </button>
+                  {(['house', 'apartment', 'condo', 'townhouse', 'villa'] as PropertyType[]).map((type) => {
+                    const Icon = propertyTypeIcons[type]
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => handlePropertyTypeChange(type)}
+                        className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-colors ${
+                          filters.propertyType === type
+                            ? 'bg-blue-50 border-blue-500 text-blue-700'
+                            : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
+                        }`}
+                      >
+                        <Icon className="h-6 w-6 mb-1" />
+                        <span className="text-sm font-medium capitalize">{type}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Reset and Done Buttons */}
+                <div className="flex items-center justify-between gap-2 pt-2 border-t">
+                  <Button
+                    variant="ghost"
+                    onClick={handlePropertyTypeReset}
+                    className="text-blue-600 hover:text-blue-700"
+                  >
+                    Reset
+                  </Button>
+                  <Button
+                    onClick={handlePropertyTypeDone}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    Done
+                  </Button>
+                </div>
               </div>
             </PopoverContent>
           </Popover>
 
           {/* Bed/Baths Combined Filter */}
           <Popover open={isBedBathPopoverOpen} onOpenChange={setIsBedBathPopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="min-w-[150px] justify-between">
-                {(() => {
-                  const bedText = filters.bedrooms === 'all' 
-                    ? '' 
-                    : Array.isArray(filters.bedrooms)
-                      ? `${filters.bedrooms.join(', ')} Beds`
-                      : `${filters.bedrooms} Beds`
-                  const bathText = filters.bathrooms === 'all'
-                    ? ''
-                    : Array.isArray(filters.bathrooms)
-                      ? `${filters.bathrooms.join(', ')} Baths`
-                      : `${filters.bathrooms} Baths`
-                  
-                  if (!bedText && !bathText) return 'Bed/Baths'
-                  if (bedText && bathText) return `${bedText} / ${bathText}`
-                  return bedText || bathText
-                })()}
-              </Button>
-            </PopoverTrigger>
+            <div className="relative inline-block">
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className={`min-w-[150px] h-11 justify-between text-base font-medium shadow-sm hover:shadow-md transition-all border-2 ${
+                    filters.bedrooms !== 'all' || filters.bathrooms !== 'all'
+                      ? 'border-blue-500 bg-blue-50/50 hover:bg-blue-50'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                  onClick={(e) => {
+                    // If clicking on X icon, don't open popover
+                    const target = e.target as HTMLElement
+                    if (target.closest('svg') || target.closest('.reset-x')) {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      return
+                    }
+                  }}
+                >
+                  <span>
+                    {(() => {
+                      const bedText = filters.bedrooms === 'all' 
+                        ? '' 
+                        : Array.isArray(filters.bedrooms)
+                          ? `${filters.bedrooms.join(', ')} Beds`
+                          : `${filters.bedrooms} Beds`
+                      const bathText = filters.bathrooms === 'all'
+                        ? ''
+                        : Array.isArray(filters.bathrooms)
+                          ? `${filters.bathrooms.join(', ')} Baths`
+                          : `${filters.bathrooms} Baths`
+                      
+                      if (!bedText && !bathText) return 'Bed/Baths'
+                      if (bedText && bathText) return `${bedText} / ${bathText}`
+                      return bedText || bathText
+                    })()}
+                  </span>
+                  {filters.bedrooms !== 'all' || filters.bathrooms !== 'all' ? (
+                    <X 
+                      className="h-5 w-5 text-blue-600 hover:text-blue-700 cursor-pointer reset-x rounded p-0.5 hover:bg-blue-100 transition-colors" 
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setIsBedBathPopoverOpen(false)
+                        handleBedBathReset()
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                    />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 opacity-50" />
+                  )}
+                </Button>
+              </PopoverTrigger>
+            </div>
             <PopoverContent className="w-[600px]">
               <div className="space-y-6">
                 {/* Beds Section */}
@@ -867,35 +1237,132 @@ function PropertyFiltersComponent({
             </PopoverContent>
           </Popover>
 
+          {/* Area Range */}
+          <Popover open={isAreaPopoverOpen} onOpenChange={setIsAreaPopoverOpen}>
+            <div className="relative inline-block">
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className={`min-w-[160px] h-11 justify-between text-base font-medium shadow-sm hover:shadow-md transition-all border-2 ${
+                    areaRange[0] !== 0 || areaRange[1] !== 500
+                      ? 'border-blue-500 bg-blue-50/50 hover:bg-blue-50'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                  onClick={(e) => {
+                    // If clicking on X icon, don't open popover
+                    const target = e.target as HTMLElement
+                    if (target.closest('svg') || target.closest('.reset-x')) {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      return
+                    }
+                  }}
+                >
+                  <span>
+                    {areaRange[0] === 0 && areaRange[1] === 500
+                      ? 'Total area'
+                      : `${areaRange[0]} - ${areaRange[1]} m²`}
+                  </span>
+                  {areaRange[0] !== 0 || areaRange[1] !== 500 ? (
+                    <X 
+                      className="h-5 w-5 text-blue-600 hover:text-blue-700 cursor-pointer reset-x rounded p-0.5 hover:bg-blue-100 transition-colors" 
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setIsAreaPopoverOpen(false)
+                        handleAreaReset()
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                    />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 opacity-50" />
+                  )}
+                </Button>
+              </PopoverTrigger>
+            </div>
+            <PopoverContent className="w-96">
+              <div className="space-y-4">
+                <Label>Total Area (m²)</Label>
+                <Slider
+                  value={areaRange}
+                  onValueChange={handleAreaChange}
+                  min={0}
+                  max={500}
+                  step={10}
+                  className="w-full [&_[data-slot=slider-thumb]]:size-6 [&_[data-slot=slider-thumb]]:border-2 [&_[data-slot=slider-range]]:bg-blue-500 [&_[data-slot=slider-thumb]]:border-blue-500"
+                />
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>{areaRange[0]} m²</span>
+                  <span>{areaRange[1]} m²</span>
+                </div>
+                
+                {/* Min/Max Input Fields */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <Input
+                      type="number"
+                      placeholder="Enter min"
+                      value={areaMinInput}
+                      onChange={(e) => handleAreaMinInputChange(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      className="w-full"
+                    />
+                  </div>
+                  <span className="text-muted-foreground">-</span>
+                  <div className="flex-1">
+                    <Input
+                      type="number"
+                      placeholder="Enter max"
+                      value={areaMaxInput}
+                      onChange={(e) => handleAreaMaxInputChange(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+
+                {/* Reset and Done Buttons */}
+                <div className="flex items-center justify-between gap-2 pt-2">
+                  <Button
+                    variant="ghost"
+                    onClick={handleAreaReset}
+                    className="text-blue-600 hover:text-blue-700"
+                  >
+                    Reset
+                  </Button>
+                  <Button
+                    onClick={handleAreaDone}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    Done
+                  </Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
           {/* Filters Button */}
           <Button 
             onClick={() => setIsFilterSidebarOpen(true)}
             variant="outline" 
-            className="gap-2"
+            className="gap-2 h-11 text-base font-medium shadow-sm hover:shadow-md transition-shadow"
           >
-            <Filter className="h-4 w-4" />
-            <span className="hidden sm:inline">Filters</span>
+            <SlidersHorizontal className="h-4 w-4" />
+            <span className="hidden sm:inline">More Filters</span>
           </Button>
 
           {/* Save Search */}
           {onSaveSearch && (
             <Button 
               onClick={() => onSaveSearchRef.current?.()} 
-              className="bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg border border-red-700 shadow-sm"
+              className="bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg border border-red-700 shadow-sm hover:shadow-md transition-shadow h-11 text-base px-5"
             >
               <span>Save search</span>
             </Button>
           )}
-
-          {/* Clear Filters */}
-          <Button
-            onClick={clearFilters}
-            variant="ghost"
-            size="icon"
-            className="flex-shrink-0"
-          >
-            <X className="h-4 w-4" />
-          </Button>
         </div>
       </div>
 

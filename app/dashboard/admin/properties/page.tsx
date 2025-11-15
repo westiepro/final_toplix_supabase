@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { AdminHeader } from '@/components/admin-header'
 import { Badge } from '@/components/ui/badge'
-import { Edit, Trash2, Plus, Search } from 'lucide-react'
+import { Edit, Trash2, Plus, Search, LayoutGrid, Table as TableIcon, MapPin, Bed, Bath, Square, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Property } from '@/types/property'
 import Image from 'next/image'
 import {
@@ -60,6 +60,7 @@ export default function PropertiesPage() {
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [listingFilter, setListingFilter] = useState<string>('all')
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table')
   const { showToast, ToastComponent } = useToast()
 
   useEffect(() => {
@@ -366,14 +367,36 @@ export default function PropertiesPage() {
               </div>
             ) : (
               <>
-                {/* Showing count */}
-                <div className="px-6 py-4 border-b">
+                {/* Showing count and View Toggle */}
+                <div className="px-6 py-4 border-b flex items-center justify-between">
                   <p className="text-sm text-muted-foreground">
                     Showing {filteredProperties.length} of {properties.length} properties
                   </p>
+                  <div className="flex items-center gap-2 border rounded-lg p-1 bg-background">
+                    <Button
+                      variant={viewMode === 'table' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('table')}
+                      className="h-8 px-3"
+                    >
+                      <TableIcon className="h-4 w-4 mr-2" />
+                      Table
+                    </Button>
+                    <Button
+                      variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('grid')}
+                      className="h-8 px-3"
+                    >
+                      <LayoutGrid className="h-4 w-4 mr-2" />
+                      Grid
+                    </Button>
+                  </div>
                 </div>
-                <div className="overflow-x-auto">
-                  <Table>
+                
+                {viewMode === 'table' ? (
+                  <div className="overflow-x-auto">
+                    <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12">
@@ -486,8 +509,24 @@ export default function PropertiesPage() {
                     </TableRow>
                   ))}
                 </TableBody>
-                </Table>
-                </div>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="p-6">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      {filteredProperties.map((property) => (
+                        <PropertyGridCard
+                          key={property.id}
+                          property={property}
+                          isSelected={selectedProperties.has(property.id)}
+                          onSelect={(checked) => handleSelectProperty(property.id, checked)}
+                          onEdit={() => handleEdit(property.id)}
+                          onDelete={() => handleDelete(property.id)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </CardContent>
@@ -497,6 +536,172 @@ export default function PropertiesPage() {
   )
 }
 
+function PropertyGridCard({
+  property,
+  isSelected,
+  onSelect,
+  onEdit,
+  onDelete,
+}: {
+  property: PropertyWithCompany
+  isSelected: boolean
+  onSelect: (checked: boolean) => void
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [isHovered, setIsHovered] = useState(false)
+  const images = property.images && property.images.length > 0 ? property.images : []
+  const hasMultipleImages = images.length > 1
+
+  const handlePreviousImage = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setCurrentImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1))
+  }
+
+  const handleNextImage = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setCurrentImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1))
+  }
+
+  return (
+    <Card 
+      className="overflow-hidden cursor-pointer transition-all hover:shadow-lg h-full flex flex-col pt-0 pb-0 gap-0"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div className="relative h-64 w-full overflow-hidden rounded-t-lg bg-muted">
+        {images.length > 0 ? (
+          <>
+            <Image
+              src={images[currentImageIndex]}
+              alt={`${property.title} - Image ${currentImageIndex + 1}`}
+              fill
+              className="object-cover"
+            />
+            {hasMultipleImages && isHovered && (
+              <>
+                <button
+                  onClick={handlePreviousImage}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-gray-500/50 hover:bg-gray-500/60 transition-all"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft className="h-5 w-5 text-white" />
+                </button>
+                <button
+                  onClick={handleNextImage}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-gray-500/50 hover:bg-gray-500/60 transition-all"
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="h-5 w-5 text-white" />
+                </button>
+              </>
+            )}
+            {hasMultipleImages && currentImageIndex > 0 && isHovered && (
+              <div className="absolute bottom-2 left-2 z-20 px-2 py-1 rounded-md bg-black/60 text-white text-xs font-medium">
+                {currentImageIndex + 1} / {images.length}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="flex h-full items-center justify-center text-muted-foreground">
+            No Image
+          </div>
+        )}
+        <div className="absolute top-2 right-2 z-20">
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={onSelect}
+            className="bg-white"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+        <div className="absolute top-2 left-2 z-20">
+          <Badge
+            variant={property.status === 'active' ? 'default' : 'secondary'}
+            className={
+              property.status === 'active'
+                ? 'bg-green-500 text-white hover:bg-green-600 border-0'
+                : ''
+            }
+          >
+            {property.status === 'active' ? 'Active' : property.status}
+          </Badge>
+        </div>
+      </div>
+      <CardContent className="px-3 pt-2 pb-2 flex-1 relative">
+        {/* Price and action icons */}
+        <div className="flex items-center justify-between mb-1.5">
+          <p className="text-2xl font-bold text-blue-600">
+            €{property.price.toLocaleString()}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 p-0 hover:bg-gray-100"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onEdit()
+              }}
+            >
+              <Edit className="h-4 w-4 text-gray-600" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 p-0 hover:bg-gray-100"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onDelete()
+              }}
+            >
+              <Trash2 className="h-4 w-4 text-gray-600 hover:text-destructive" />
+            </Button>
+          </div>
+        </div>
+        
+        <h3 className="font-semibold text-lg mb-1 line-clamp-1">
+          {property.title}
+        </h3>
+        
+        {/* Location - only city */}
+        <div className="flex items-center gap-1 text-base text-muted-foreground mb-1.5">
+          <MapPin className="h-4 w-4" />
+          <span>{property.city}</span>
+        </div>
+        
+        {/* Divider line */}
+        <div className="border-t border-gray-200 my-1.5"></div>
+        
+        {/* Property details */}
+        <div className="flex items-center gap-4 text-base">
+          <div className="flex items-center gap-1.5">
+            <Bed className="h-5 w-5 text-muted-foreground" />
+            <span className="font-medium">{property.bedrooms}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Bath className="h-5 w-5 text-muted-foreground" />
+            <span className="font-medium">{property.bathrooms}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Square className="h-5 w-5 text-muted-foreground" />
+            <span className="font-medium">{property.area} m²</span>
+          </div>
+          
+          {/* Property type at bottom right */}
+          <div className="ml-auto">
+            <span className="text-sm font-medium capitalize">{property.property_type}</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 function PropertyForm({
   property,
