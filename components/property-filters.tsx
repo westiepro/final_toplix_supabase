@@ -78,7 +78,7 @@ function PropertyFiltersComponent({
   // Internal state - completely independent
   const [filters, setFilters] = useState<FilterState>(defaultFilters)
   const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false)
-  const [priceRange, setPriceRange] = useState([0, 2000000])
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000000])
   const [priceMinInput, setPriceMinInput] = useState<string>('')
   const [priceMaxInput, setPriceMaxInput] = useState<string>('')
   const [isPricePopoverOpen, setIsPricePopoverOpen] = useState(false)
@@ -86,7 +86,7 @@ function PropertyFiltersComponent({
   const [isPropertyTypePopoverOpen, setIsPropertyTypePopoverOpen] = useState(false)
   const [selectedBeds, setSelectedBeds] = useState<number[]>([])
   const [selectedBaths, setSelectedBaths] = useState<number[]>([])
-  const [areaRange, setAreaRange] = useState([0, 500])
+  const [areaRange, setAreaRange] = useState<[number, number]>([0, 500])
   const [cityInput, setCityInput] = useState('')
   const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -318,7 +318,7 @@ function PropertyFiltersComponent({
     // Snap values to correct steps
     const snappedMin = snapToStep(min)
     const snappedMax = snapToStep(max)
-    const newRange = [snappedMin, snappedMax]
+    const newRange: [number, number] = [snappedMin, snappedMax]
     setPriceRange(newRange)
     setPriceMinInput(snappedMin === 0 ? '' : snappedMin.toString())
     setPriceMaxInput(snappedMax === 2000000 ? '' : snappedMax.toString())
@@ -338,7 +338,7 @@ function PropertyFiltersComponent({
     const numValue = parseInt(value) || 0
     const clampedValue = Math.max(0, Math.min(numValue, priceRange[1]))
     const snappedValue = snapToStep(clampedValue)
-    const newRange = [snappedValue, priceRange[1]]
+    const newRange: [number, number] = [snappedValue, priceRange[1]]
     setPriceRange(newRange)
     setFilters((prev) => {
       const newFilters = { ...prev, minPrice: snappedValue, maxPrice: priceRange[1] }
@@ -355,7 +355,7 @@ function PropertyFiltersComponent({
     const numValue = parseInt(value) || 0
     const clampedValue = Math.max(priceRange[0], Math.min(numValue, 5000000))
     const snappedValue = snapToStep(clampedValue)
-    const newRange = [priceRange[0], snappedValue]
+    const newRange: [number, number] = [priceRange[0], snappedValue]
     setPriceRange(newRange)
     setFilters((prev) => {
       const newFilters = { ...prev, minPrice: priceRange[0], maxPrice: snappedValue }
@@ -368,7 +368,7 @@ function PropertyFiltersComponent({
   }, [priceRange, snapToStep])
 
   const handlePriceReset = useCallback(() => {
-    const defaultRange = [0, 2000000]
+    const defaultRange: [number, number] = [0, 2000000]
     setPriceRange(defaultRange)
     setPriceMinInput('')
     setPriceMaxInput('')
@@ -387,7 +387,7 @@ function PropertyFiltersComponent({
   }, [])
   
   const handleAreaChange = useCallback((values: number[]) => {
-    setAreaRange(values)
+    setAreaRange([values[0], values[1]] as [number, number])
     setFilters((prev) => {
       if (prev.minArea === values[0] && prev.maxArea === values[1]) return prev
       const newFilters = { ...prev, minArea: values[0], maxArea: values[1] }
@@ -430,7 +430,7 @@ function PropertyFiltersComponent({
     if (value === 'any') {
       setSelectedBeds([])
       setFilters((prev) => {
-        const newFilters = { ...prev, bedrooms: 'all' }
+        const newFilters: FilterState = { ...prev, bedrooms: 'all' as const }
         setTimeout(() => {
           onFiltersChangeRef.current(newFilters)
         }, 0)
@@ -452,9 +452,9 @@ function PropertyFiltersComponent({
 
       // Update filter with selected values
       setFilters((prevFilters) => {
-        const newFilters = {
+        const newFilters: FilterState = {
           ...prevFilters,
-          bedrooms: newSelection.length === 0 ? 'all' : newSelection.length === 1 ? newSelection[0] : newSelection,
+          bedrooms: newSelection.length === 0 ? ('all' as const) : newSelection.length === 1 ? newSelection[0] : newSelection,
         }
         setTimeout(() => {
           onFiltersChangeRef.current(newFilters)
@@ -470,7 +470,7 @@ function PropertyFiltersComponent({
     if (value === 'any') {
       setSelectedBaths([])
       setFilters((prev) => {
-        const newFilters = { ...prev, bathrooms: 'all' }
+        const newFilters: FilterState = { ...prev, bathrooms: 'all' as const }
         setTimeout(() => {
           onFiltersChangeRef.current(newFilters)
         }, 0)
@@ -491,9 +491,9 @@ function PropertyFiltersComponent({
 
       // Update filter with selected values
       setFilters((prevFilters) => {
-        const newFilters = {
+        const newFilters: FilterState = {
           ...prevFilters,
-          bathrooms: newSelection.length === 0 ? 'all' : newSelection.length === 1 ? newSelection[0] : newSelection,
+          bathrooms: newSelection.length === 0 ? ('all' as const) : newSelection.length === 1 ? newSelection[0] : newSelection,
         }
         setTimeout(() => {
           onFiltersChangeRef.current(newFilters)
@@ -508,7 +508,7 @@ function PropertyFiltersComponent({
     setSelectedBeds([])
     setSelectedBaths([])
     setFilters((prev) => {
-      const newFilters = { ...prev, bedrooms: 'all', bathrooms: 'all' }
+      const newFilters: FilterState = { ...prev, bedrooms: 'all' as const, bathrooms: 'all' as const }
       setTimeout(() => {
         onFiltersChangeRef.current(newFilters)
       }, 0)
@@ -526,12 +526,12 @@ function PropertyFiltersComponent({
     setCityInput('')
     setCitySuggestions([])
     setShowSuggestions(false)
-    setPriceRange([0, 2000000])
+    setPriceRange([0, 2000000] as [number, number])
     setPriceMinInput('')
     setPriceMaxInput('')
     setSelectedBeds([])
     setSelectedBaths([])
-    setAreaRange([0, 500])
+    setAreaRange([0, 500] as [number, number])
     lastNotifiedRef.current = ''
     notifyParent(cleared)
   }, [notifyParent])

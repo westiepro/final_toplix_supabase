@@ -305,8 +305,6 @@ export function LocationPicker({
           dragRotate={false}
           scrollZoom={false}
           doubleClickZoom={false}
-          touchZoom={false}
-          touchRotate={false}
           ref={mapRef}
         >
           {markerPosition && (
