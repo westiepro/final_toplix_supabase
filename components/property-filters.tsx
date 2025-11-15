@@ -1239,7 +1239,7 @@ function PropertyFiltersComponent({
 
           {/* Area Range */}
           <Popover open={isAreaPopoverOpen} onOpenChange={setIsAreaPopoverOpen}>
-            <div className="relative inline-block">
+            <div className="relative inline-block hidden lg:block">
               <PopoverTrigger asChild>
                 <Button 
                   variant="outline" 
