@@ -216,7 +216,6 @@ export function LocationPicker({
     <div className="space-y-4">
       {/* City Search */}
       <div className="relative">
-        <Label htmlFor="city-search">Search City</Label>
         <Input
           id="city-search"
           type="text"

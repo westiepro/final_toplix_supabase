@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect, memo } from 'react'
+import { createPortal } from 'react-dom'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -66,6 +67,8 @@ function PropertyFiltersComponent({
   const [cityInput, setCityInput] = useState('')
   const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [inputPosition, setInputPosition] = useState<{ top: number; left: number; width: number } | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   
   // Store callbacks in refs so they never cause re-renders
   const onFiltersChangeRef = useRef(onFiltersChange)
@@ -95,6 +98,30 @@ function PropertyFiltersComponent({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.city])
+
+  // Update dropdown position on scroll/resize
+  useEffect(() => {
+    if (!showSuggestions || !inputRef.current) return
+
+    const updatePosition = () => {
+      if (inputRef.current) {
+        const rect = inputRef.current.getBoundingClientRect()
+        setInputPosition({
+          top: rect.bottom + window.scrollY,
+          left: rect.left + window.scrollX,
+          width: rect.width,
+        })
+      }
+    }
+
+    window.addEventListener('scroll', updatePosition, true)
+    window.addEventListener('resize', updatePosition)
+
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true)
+      window.removeEventListener('resize', updatePosition)
+    }
+  }, [showSuggestions])
   
   // Cleanup on unmount
   useEffect(() => {
@@ -155,6 +182,15 @@ function PropertyFiltersComponent({
         }))
         setCitySuggestions(suggestions)
         setShowSuggestions(true)
+        // Update position when suggestions are loaded
+        if (inputRef.current) {
+          const rect = inputRef.current.getBoundingClientRect()
+          setInputPosition({
+            top: rect.bottom + window.scrollY,
+            left: rect.left + window.scrollX,
+            width: rect.width,
+          })
+        }
       } else {
         setCitySuggestions([])
         setShowSuggestions(false)
@@ -272,10 +308,19 @@ function PropertyFiltersComponent({
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground z-10" />
               <Input
+                ref={inputRef}
                 placeholder="Search for city (Portugal & Spain)"
                 value={cityInput}
                 onChange={(e) => handleCityChange(e.target.value)}
                 onFocus={() => {
+                  if (inputRef.current) {
+                    const rect = inputRef.current.getBoundingClientRect()
+                    setInputPosition({
+                      top: rect.bottom + window.scrollY,
+                      left: rect.left + window.scrollX,
+                      width: rect.width,
+                    })
+                  }
                   if (citySuggestions.length > 0) {
                     setShowSuggestions(true)
                   }
@@ -287,22 +332,32 @@ function PropertyFiltersComponent({
                 className="pl-10"
               />
             </div>
-            {showSuggestions && citySuggestions.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
-                {citySuggestions.map((suggestion, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => handleCitySelect(suggestion)}
-                    className="w-full text-left px-4 py-2 hover:bg-accent hover:text-accent-foreground transition-colors border-b last:border-b-0"
-                  >
-                    <div className="font-medium">{suggestion.name}</div>
-                    <div className="text-xs text-muted-foreground">{suggestion.country}</div>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
+          
+          {/* Render dropdown in portal to appear above everything */}
+          {typeof window !== 'undefined' && showSuggestions && citySuggestions.length > 0 && inputPosition && createPortal(
+            <div
+              className="fixed bg-popover border rounded-md shadow-lg z-[9999] max-h-60 overflow-y-auto"
+              style={{
+                top: `${inputPosition.top + 4}px`,
+                left: `${inputPosition.left}px`,
+                width: `${inputPosition.width}px`,
+              }}
+            >
+              {citySuggestions.map((suggestion, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => handleCitySelect(suggestion)}
+                  className="w-full text-left px-4 py-2 hover:bg-accent hover:text-accent-foreground transition-colors border-b last:border-b-0"
+                >
+                  <div className="font-medium">{suggestion.name}</div>
+                  <div className="text-xs text-muted-foreground">{suggestion.country}</div>
+                </button>
+              ))}
+            </div>,
+            document.body
+          )}
 
           {/* Price Range */}
           <Popover>

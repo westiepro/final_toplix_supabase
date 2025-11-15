@@ -436,7 +436,6 @@ function PropertyForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Location Picker - Moved to top */}
       <div>
-        <Label>Property Location</Label>
         <LocationPicker
           initialLatitude={formData.latitude && formData.latitude !== 0 ? formData.latitude : undefined}
           initialLongitude={formData.longitude && formData.longitude !== 0 ? formData.longitude : undefined}

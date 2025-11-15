@@ -15,6 +15,7 @@ interface PropertyCardProps {
 
 export function PropertyCard({ property, onClick }: PropertyCardProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [isHovered, setIsHovered] = useState(false)
   const images = property.images && property.images.length > 0 ? property.images : []
   const hasMultipleImages = images.length > 1
 
@@ -36,7 +37,11 @@ export function PropertyCard({ property, onClick }: PropertyCardProps) {
       className="block w-full"
       onClick={onClick}
     >
-      <Card className="cursor-pointer transition-all hover:shadow-lg h-full">
+      <Card 
+        className="cursor-pointer transition-all hover:shadow-lg h-full"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
         <CardHeader className="p-0">
           <div className="relative h-48 w-full overflow-hidden rounded-t-lg bg-muted">
             {images.length > 0 ? (
@@ -47,23 +52,29 @@ export function PropertyCard({ property, onClick }: PropertyCardProps) {
                   fill
                   className="object-cover"
                 />
-                {hasMultipleImages && (
+                {hasMultipleImages && isHovered && (
                   <>
                     <button
                       onClick={handlePreviousImage}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-gray-500/50 hover:bg-gray-500/60 transition-colors"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-gray-500/50 hover:bg-gray-500/60 transition-all"
                       aria-label="Previous image"
                     >
                       <ChevronLeft className="h-5 w-5 text-white" />
                     </button>
                     <button
                       onClick={handleNextImage}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-gray-500/50 hover:bg-gray-500/60 transition-colors"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-gray-500/50 hover:bg-gray-500/60 transition-all"
                       aria-label="Next image"
                     >
                       <ChevronRight className="h-5 w-5 text-white" />
                     </button>
                   </>
+                )}
+                {/* Image counter - only show when on 2nd image or beyond and hovering */}
+                {hasMultipleImages && currentImageIndex > 0 && isHovered && (
+                  <div className="absolute bottom-2 left-2 z-20 px-2 py-1 rounded-md bg-black/60 text-white text-xs font-medium">
+                    {currentImageIndex + 1} / {images.length}
+                  </div>
                 )}
               </>
             ) : (
