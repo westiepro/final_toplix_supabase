@@ -7,7 +7,7 @@ import { Property } from '@/types/property'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Map as MapIcon, Satellite } from 'lucide-react'
+import { Map as MapIcon, Satellite, MapPin, Bed, Bath, Square, Share2, Heart, X, Plus, Minus } from 'lucide-react'
 import Image from 'next/image'
 
 // Format price based on listing type
@@ -41,6 +41,7 @@ interface PropertyMapProps {
   onViewportChange?: (bounds: { ne: [number, number]; sw: [number, number] }) => void
   initialCenter?: [number, number]
   initialZoom?: number
+  hoveredPropertyId?: string | null
 }
 
 export interface PropertyMapRef {
@@ -54,6 +55,7 @@ export const PropertyMap = forwardRef<PropertyMapRef, PropertyMapProps>(
       onViewportChange,
       initialCenter = [-7.9322, 37.0194], // Default to Faro, Algarve
       initialZoom = 10,
+      hoveredPropertyId = null,
     },
     ref
   ) {
@@ -67,6 +69,7 @@ export const PropertyMap = forwardRef<PropertyMapRef, PropertyMapProps>(
   })
     const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
     const [mapStyle, setMapStyle] = useState<'map' | 'satellite'>('map')
+    const [isFavorited, setIsFavorited] = useState(false)
     const mapRef = useRef<any>(null)
 
   useImperativeHandle(ref, () => ({
@@ -155,6 +158,13 @@ export const PropertyMap = forwardRef<PropertyMapRef, PropertyMapProps>(
       // This prevents the infinite loop
     }, [])
 
+    const handleMapClick = useCallback(() => {
+      // Close popup when clicking on the map
+      if (selectedProperty) {
+        setSelectedProperty(null)
+      }
+    }, [selectedProperty])
+
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
 
   if (!mapboxToken) {
@@ -169,6 +179,32 @@ export const PropertyMap = forwardRef<PropertyMapRef, PropertyMapProps>(
 
   const toggleMapStyle = () => {
     setMapStyle((prev) => (prev === 'map' ? 'satellite' : 'map'))
+  }
+
+  const handleZoomIn = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const newZoom = Math.min(viewState.zoom + 1, 22) // Max zoom level is typically 22
+    if (mapRef.current) {
+      const map = mapRef.current.getMap()
+      if (map) {
+        map.zoomTo(newZoom, { duration: 300 })
+        // Don't update viewState here - let onMove handler sync it during animation
+      }
+    }
+  }
+
+  const handleZoomOut = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const newZoom = Math.max(viewState.zoom - 1, 0) // Min zoom level is 0
+    if (mapRef.current) {
+      const map = mapRef.current.getMap()
+      if (map) {
+        map.zoomTo(newZoom, { duration: 300 })
+        // Don't update viewState here - let onMove handler sync it during animation
+      }
+    }
   }
 
   const currentMapStyle = mapStyle === 'satellite' 
@@ -199,31 +235,60 @@ export const PropertyMap = forwardRef<PropertyMapRef, PropertyMapProps>(
         </Button>
       </div>
 
+      {/* Zoom Controls */}
+      <div className="absolute top-4 right-4 z-10">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-lg overflow-hidden">
+          <button
+            type="button"
+            onClick={handleZoomIn}
+            className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 transition-colors border-b border-gray-200"
+            aria-label="Zoom in"
+          >
+            <Plus className="h-5 w-5 text-gray-700" />
+          </button>
+          <button
+            type="button"
+            onClick={handleZoomOut}
+            className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 transition-colors"
+            aria-label="Zoom out"
+          >
+            <Minus className="h-5 w-5 text-gray-700" />
+          </button>
+        </div>
+      </div>
+
       <Map
         ref={mapRef}
         {...viewState}
         onMove={handleMove}
+        onClick={handleMapClick}
         mapboxAccessToken={mapboxToken}
         style={{ width: '100%', height: '100%' }}
         mapStyle={currentMapStyle}
       >
-        {properties.map((property) => (
-          <Marker
-            key={property.id}
-            longitude={property.longitude}
-            latitude={property.latitude}
-            anchor="bottom"
-          >
-            <button
-              onClick={() => setSelectedProperty(property)}
-              className="cursor-pointer group"
+        {properties.map((property) => {
+          const isHovered = hoveredPropertyId === property.id
+          return (
+            <Marker
+              key={property.id}
+              longitude={property.longitude}
+              latitude={property.latitude}
+              anchor="bottom"
             >
-              <div className="bg-blue-600 text-white px-[1px] py-[1px] rounded-lg shadow-lg border-2 border-white font-normal text-xs whitespace-nowrap hover:scale-105 transition-transform">
-                {formatPrice(property.price, property.listing_type)}
-              </div>
-            </button>
-          </Marker>
-        ))}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setSelectedProperty(property)
+                }}
+                className="cursor-pointer group"
+              >
+                <div className={`${isHovered ? 'bg-sky-400 scale-110' : 'bg-blue-600'} text-white px-[1px] py-[1px] rounded-lg shadow-lg border-2 border-white font-semibold text-xs whitespace-nowrap hover:scale-105 transition-all duration-200`}>
+                  {formatPrice(property.price, property.listing_type)}
+                </div>
+              </button>
+            </Marker>
+          )
+        })}
 
                  {selectedProperty && (
                    <Popup
@@ -231,20 +296,36 @@ export const PropertyMap = forwardRef<PropertyMapRef, PropertyMapProps>(
                      latitude={selectedProperty.latitude}
                      anchor="bottom"
                      onClose={() => setSelectedProperty(null)}
-                     closeButton={true}
-                     closeOnClick={false}
+                     closeButton={false}
+                     closeOnClick={true}
+                     className="!p-0"
                    >
-                     <Link 
-                       href={`/property/${selectedProperty.id}`}
-                       className="block no-underline"
-                       onClick={(e) => {
-                         // Allow the link to work
-                         e.stopPropagation()
-                       }}
-                     >
-                       <Card className="w-64 cursor-pointer hover:shadow-lg transition-shadow">
-                         <CardContent className="p-0">
-                           <div className="relative h-32 w-full overflow-hidden rounded-t-lg bg-muted">
+                     <div className="relative">
+                       {/* Custom Close Button */}
+                       <button
+                         onClick={(e) => {
+                           e.preventDefault()
+                           e.stopPropagation()
+                           setSelectedProperty(null)
+                         }}
+                         className="absolute top-2 right-2 z-20 p-1.5 rounded-full bg-gray-500/50 hover:bg-gray-500/60 transition-all"
+                         aria-label="Close popup"
+                       >
+                         <X className="h-5 w-5 text-white" />
+                       </button>
+                       
+                       <Link 
+                         href={`/property/${selectedProperty.id}`}
+                         className="block no-underline"
+                         onClick={(e) => {
+                           // Allow the link to work
+                           e.stopPropagation()
+                         }}
+                       >
+                       <Card className="w-64 cursor-pointer hover:shadow-lg transition-shadow pt-0 pb-0 gap-0 h-full">
+                         <CardContent className="p-0 h-full flex flex-col">
+                           {/* Image */}
+                           <div className="relative h-36 w-full overflow-hidden rounded-t-lg bg-muted flex-shrink-0">
                              {selectedProperty.images && selectedProperty.images.length > 0 ? (
                                <Image
                                  src={selectedProperty.images[0]}
@@ -253,35 +334,103 @@ export const PropertyMap = forwardRef<PropertyMapRef, PropertyMapProps>(
                                  className="object-cover"
                                />
                              ) : (
-                               <div className="flex h-full items-center justify-center text-muted-foreground">
+                               <div className="flex h-full items-center justify-center text-muted-foreground text-xs">
                                  No Image
                                </div>
                              )}
                            </div>
-                           <div className="p-3">
-                             <div className="flex items-start justify-between mb-2">
-                               <h4 className="font-semibold text-sm line-clamp-1">
+                           
+                           {/* Content - Stretch to fill remaining space */}
+                           <div className="px-3 pt-2 pb-2 flex-1 flex flex-col justify-between">
+                             <div>
+                               {/* Price and action icons */}
+                               <div className="flex items-center justify-between mb-1.5">
+                                 <p className="text-xl font-bold text-blue-600">
+                                   €{selectedProperty.price.toLocaleString()}
+                                 </p>
+                                 <div className="flex items-center gap-1.5">
+                                   <button
+                                     onClick={(e) => {
+                                       e.preventDefault()
+                                       e.stopPropagation()
+                                       const propertyUrl = `${window.location.origin}/property/${selectedProperty.id}`
+                                       if (navigator.share) {
+                                         navigator.share({
+                                           title: selectedProperty.title,
+                                           text: selectedProperty.description,
+                                           url: propertyUrl,
+                                         }).catch(() => {})
+                                       } else {
+                                         navigator.clipboard.writeText(propertyUrl).then(() => {
+                                           alert('Property link copied to clipboard!')
+                                         }).catch(() => {})
+                                       }
+                                     }}
+                                     className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                                     aria-label="Share property"
+                                   >
+                                     <Share2 className="h-4 w-4 text-gray-600" />
+                                   </button>
+                                   <button
+                                     onClick={(e) => {
+                                       e.preventDefault()
+                                       e.stopPropagation()
+                                       setIsFavorited((prev) => !prev)
+                                     }}
+                                     className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                                     aria-label="Add to favorites"
+                                   >
+                                     <Heart 
+                                       className={`h-4 w-4 transition-colors ${
+                                         isFavorited ? 'fill-red-500 text-red-500' : 'text-gray-600'
+                                       }`} 
+                                     />
+                                   </button>
+                                 </div>
+                               </div>
+                               
+                               <h3 className="font-semibold text-sm mb-1 line-clamp-1">
                                  {selectedProperty.title}
-                               </h4>
-                               <Badge variant="secondary" className="ml-2 text-xs">
-                                 {selectedProperty.property_type}
-                               </Badge>
+                               </h3>
+                               
+                               {/* Location - only city with flag */}
+                               <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1.5">
+                                 <MapPin className="h-3 w-3" />
+                                 <span>{selectedProperty.city}</span>
+                                 <span className="text-sm">🇵🇹</span>
+                               </div>
                              </div>
-                             <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
-                               {selectedProperty.address}, {selectedProperty.city}
-                             </p>
-                             <p className="text-lg font-bold text-primary">
-                               €{selectedProperty.price.toLocaleString()}
-                             </p>
-                             <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                               <span>{selectedProperty.bedrooms} bed</span>
-                               <span>{selectedProperty.bathrooms} bath</span>
-                               <span>{selectedProperty.area} sqft</span>
+                             
+                             <div>
+                               {/* Divider line */}
+                               <div className="border-t border-gray-200 my-1.5"></div>
+                               
+                               {/* Property details */}
+                               <div className="flex items-center gap-3 text-sm">
+                                 <div className="flex items-center gap-1">
+                                   <Bed className="h-4 w-4 text-muted-foreground" />
+                                   <span className="font-medium text-xs">{selectedProperty.bedrooms}</span>
+                                 </div>
+                                 <div className="flex items-center gap-1">
+                                   <Bath className="h-4 w-4 text-muted-foreground" />
+                                   <span className="font-medium text-xs">{selectedProperty.bathrooms}</span>
+                                 </div>
+                                 <div className="flex items-center gap-1">
+                                   <Square className="h-4 w-4 text-muted-foreground" />
+                                   <span className="font-medium text-xs">{selectedProperty.area} m²</span>
+                                 </div>
+                                 
+                                 {/* Property type at bottom right */}
+                                 <div className="ml-auto">
+                                   <span className="text-xs font-medium capitalize">{selectedProperty.property_type}</span>
+                                 </div>
+                               </div>
                              </div>
                            </div>
                          </CardContent>
                        </Card>
-                     </Link>
+                       </Link>
+                     </div>
                    </Popup>
                  )}
       </Map>

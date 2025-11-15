@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { AdminHeader } from '@/components/admin-header'
 import { Badge } from '@/components/ui/badge'
-import { Edit, Trash2, Plus } from 'lucide-react'
+import { Edit, Trash2, Plus, Search } from 'lucide-react'
 import { Property } from '@/types/property'
 import Image from 'next/image'
 import {
@@ -42,6 +42,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { ImageUpload } from '@/components/image-upload'
 import { LocationPicker } from '@/components/location-picker'
+import { useToast } from '@/components/ui/toast'
 
 interface PropertyWithCompany extends Property {
   company_name?: string
@@ -50,10 +51,16 @@ interface PropertyWithCompany extends Property {
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<PropertyWithCompany[]>([])
+  const [filteredProperties, setFilteredProperties] = useState<PropertyWithCompany[]>([])
   const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set())
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingProperty, setEditingProperty] = useState<PropertyWithCompany | null>(null)
   const [isAddingProperty, setIsAddingProperty] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [listingFilter, setListingFilter] = useState<string>('all')
+  const { showToast, ToastComponent } = useToast()
 
   useEffect(() => {
     loadProperties()
@@ -63,11 +70,46 @@ export default function PropertiesPage() {
     try {
       const data = await fetchPropertiesWithCompany()
       setProperties(data)
+      setFilteredProperties(data)
     } catch (error) {
       console.error('Error loading properties:', error)
       setProperties([])
+      setFilteredProperties([])
     }
   }
+
+  // Apply filters whenever search or filters change
+  useEffect(() => {
+    let filtered = [...properties]
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(
+        (p) =>
+          p.title.toLowerCase().includes(query) ||
+          p.city.toLowerCase().includes(query) ||
+          p.address.toLowerCase().includes(query)
+      )
+    }
+
+    // Type filter
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter((p) => p.property_type === typeFilter)
+    }
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((p) => (p.status || 'active') === statusFilter)
+    }
+
+    // Listing filter
+    if (listingFilter !== 'all') {
+      filtered = filtered.filter((p) => p.listing_type === listingFilter)
+    }
+
+    setFilteredProperties(filtered)
+  }, [properties, searchQuery, typeFilter, statusFilter, listingFilter])
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this property?')) {
@@ -127,12 +169,12 @@ export default function PropertiesPage() {
         const newProperty = await createProperty({
           title: data.title || '',
           description: data.description || '',
-          price: data.price || 0,
+          price: data.price ?? 0,
           property_type: data.property_type || 'house',
           listing_type: data.listing_type || 'buy',
-          bedrooms: data.bedrooms || 0,
-          bathrooms: data.bathrooms || 0,
-          area: data.area || 0,
+          bedrooms: data.bedrooms ?? 0,
+          bathrooms: data.bathrooms ?? 0,
+          area: data.area ?? 0,
           address: data.address || '',
           city: data.city || '',
           state: '', // Default empty state since field was removed from form
@@ -152,6 +194,7 @@ export default function PropertiesPage() {
           setProperties([propertyWithCompany, ...properties])
           setIsDialogOpen(false)
           setIsAddingProperty(false)
+          showToast('Property added successfully!', 'success')
         } else {
           // Check if Supabase is configured
           const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -180,7 +223,7 @@ export default function PropertiesPage() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedProperties(new Set(properties.map((p) => p.id)))
+      setSelectedProperties(new Set(filteredProperties.map((p) => p.id)))
     } else {
       setSelectedProperties(new Set())
     }
@@ -213,10 +256,11 @@ export default function PropertiesPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {ToastComponent}
       <AdminHeader 
         title="All Properties"
         actionButton={
-          <Button onClick={handleAddNew}>
+          <Button onClick={handleAddNew} className="bg-blue-600 hover:bg-blue-700">
             <Plus className="mr-2 h-4 w-4" />
             Add Property
           </Button>
@@ -230,7 +274,7 @@ export default function PropertiesPage() {
           setIsAddingProperty(false)
         }
       }}>
-        <DialogContent className="!max-w-[60vw] sm:!max-w-[60vw] w-full max-h-[90vh] overflow-y-auto">
+        <DialogContent className="!max-w-[60vw] sm:!max-w-[60vw] w-full max-h-[90vh] overflow-y-auto" onWheel={(e) => e.stopPropagation()} onTouchMove={(e) => e.stopPropagation()}>
           <DialogHeader>
             <DialogTitle>
               {editingProperty ? 'Edit Property' : 'Add New Property'}
@@ -256,20 +300,85 @@ export default function PropertiesPage() {
       </Dialog>
 
       <div className="p-6">
+        {/* Search and Filters */}
+        <Card className="mb-4 border-2 shadow-md">
+          <CardContent className="p-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Search */}
+              <div className="flex-1 min-w-[200px] relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search by title, city, or address..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+
+              {/* All Types Filter */}
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="min-w-[150px]">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="house">House</SelectItem>
+                  <SelectItem value="apartment">Apartment</SelectItem>
+                  <SelectItem value="condo">Condo</SelectItem>
+                  <SelectItem value="townhouse">Townhouse</SelectItem>
+                  <SelectItem value="villa">Villa</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* All Status Filter */}
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="min-w-[150px]">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* All Listings Filter */}
+              <Select value={listingFilter} onValueChange={setListingFilter}>
+                <SelectTrigger className="min-w-[150px]">
+                  <SelectValue placeholder="All Listings" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Listings</SelectItem>
+                  <SelectItem value="buy">For Sale</SelectItem>
+                  <SelectItem value="rent">For Rent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardContent className="p-0">
-            {properties.length === 0 ? (
+            {filteredProperties.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
-                No properties yet
+                {properties.length === 0 ? 'No properties yet' : 'No properties match your filters'}
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
+              <>
+                {/* Showing count */}
+                <div className="px-6 py-4 border-b">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {filteredProperties.length} of {properties.length} properties
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12">
                         <Checkbox
-                          checked={selectedProperties.size === properties.length && properties.length > 0}
+                          checked={selectedProperties.size === filteredProperties.length && filteredProperties.length > 0}
                           onCheckedChange={handleSelectAll}
                         />
                       </TableHead>
@@ -285,7 +394,7 @@ export default function PropertiesPage() {
                     </TableRow>
                   </TableHeader>
                 <TableBody>
-                  {properties.map((property) => (
+                  {filteredProperties.map((property) => (
                     <TableRow key={property.id}>
                       <TableCell>
                         <Checkbox
@@ -378,7 +487,8 @@ export default function PropertiesPage() {
                   ))}
                 </TableBody>
                 </Table>
-              </div>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -400,12 +510,12 @@ function PropertyForm({
   const [formData, setFormData] = useState<Partial<PropertyWithCompany>>({
     title: property?.title || '',
     description: property?.description || '',
-    price: property?.price || 0,
+    price: property?.price || undefined,
     property_type: property?.property_type || 'house',
     listing_type: property?.listing_type || 'buy',
-    bedrooms: property?.bedrooms || 0,
-    bathrooms: property?.bathrooms || 0,
-    area: property?.area || 0,
+    bedrooms: property?.bedrooms || undefined,
+    bathrooms: property?.bathrooms || undefined,
+    area: property?.area || undefined,
     address: property?.address || '', // Empty by default
     city: property?.city || '', // Empty by default
     zip_code: property?.zip_code || '', // Empty by default
@@ -433,7 +543,7 @@ function PropertyForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4" onWheel={(e) => e.stopPropagation()} onTouchMove={(e) => e.stopPropagation()}>
       {/* Location Picker - Moved to top */}
       <div>
         <LocationPicker
@@ -522,9 +632,9 @@ function PropertyForm({
           <Input
             id="price"
             type="number"
-            value={formData.price}
+            value={formData.price || ''}
             onChange={(e) =>
-              setFormData({ ...formData, price: parseInt(e.target.value) || 0 })
+              setFormData({ ...formData, price: e.target.value ? parseInt(e.target.value) : undefined })
             }
             required
           />
@@ -583,8 +693,8 @@ function PropertyForm({
               <SelectValue placeholder="Select listing type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="buy">Buy</SelectItem>
-              <SelectItem value="rent">Rent</SelectItem>
+              <SelectItem value="buy">For Sale</SelectItem>
+              <SelectItem value="rent">For Rent</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -597,9 +707,9 @@ function PropertyForm({
             id="bedrooms"
             type="number"
             min="0"
-            value={formData.bedrooms}
+            value={formData.bedrooms ?? ''}
             onChange={(e) =>
-              setFormData({ ...formData, bedrooms: parseInt(e.target.value) || 0 })
+              setFormData({ ...formData, bedrooms: e.target.value ? parseInt(e.target.value) : undefined })
             }
             required
           />
@@ -610,9 +720,9 @@ function PropertyForm({
             id="bathrooms"
             type="number"
             min="0"
-            value={formData.bathrooms}
+            value={formData.bathrooms ?? ''}
             onChange={(e) =>
-              setFormData({ ...formData, bathrooms: parseInt(e.target.value) || 0 })
+              setFormData({ ...formData, bathrooms: e.target.value ? parseInt(e.target.value) : undefined })
             }
             required
           />
@@ -623,9 +733,9 @@ function PropertyForm({
             id="area"
             type="number"
             min="0"
-            value={formData.area}
+            value={formData.area ?? ''}
             onChange={(e) =>
-              setFormData({ ...formData, area: parseInt(e.target.value) || 0 })
+              setFormData({ ...formData, area: e.target.value ? parseInt(e.target.value) : undefined })
             }
             required
           />

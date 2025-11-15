@@ -121,3 +121,18 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom Mapbox Popup Styling */
+.mapboxgl-popup-content {
+  padding: 0 !important;
+  border-radius: 0.5rem;
+}
+
+.mapboxgl-popup-tip {
+  border-top-color: white !important;
+}
+
+/* Hide left Mapbox logo, keep right attribution */
+.mapboxgl-ctrl-logo {
+  display: none !important;
+}

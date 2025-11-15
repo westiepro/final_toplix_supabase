@@ -11,8 +11,8 @@ export default function Home() {
       {/* Background Image with Overlay */}
       <div className="absolute inset-0 z-0">
         <Image
-          src="https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1920&q=80"
-          alt="Beautiful home"
+          src={`https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'dsmqoilal'}/image/upload/hero-garden-villa_r5byuu`}
+          alt="Luxurious Mediterranean villa with infinity pool overlooking the coast"
           fill
           className="object-cover"
           priority

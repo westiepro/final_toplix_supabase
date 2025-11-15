@@ -52,7 +52,15 @@ export async function fetchPropertiesByType(listingType: 'buy' | 'rent'): Promis
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     
     if (!supabaseUrl || !supabaseKey) {
-      console.warn('Supabase not configured. Using mock data.')
+      console.warn('⚠️ Supabase not configured. Environment variables missing.')
+      console.warn('💡 Please add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to your .env.local file')
+      return []
+    }
+
+    // Validate URL format
+    if (!supabaseUrl.startsWith('http://') && !supabaseUrl.startsWith('https://')) {
+      console.error('❌ Invalid Supabase URL format:', supabaseUrl)
+      console.error('💡 URL should start with http:// or https://')
       return []
     }
 
@@ -69,12 +77,21 @@ export async function fetchPropertiesByType(listingType: 'buy' | 'rent'): Promis
 
     if (error) {
       console.error('❌ Error fetching properties by type:', listingType)
-      console.error('Error object:', error)
       console.error('Error message:', error.message)
       console.error('Error code:', error.code)
-      console.error('Error details:', error.details)
-      console.error('Error hint:', error.hint)
-      console.error('Full error:', JSON.stringify(error, null, 2))
+      
+      // Handle network errors specifically
+      if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+        console.error('🌐 NETWORK ERROR: Unable to connect to Supabase')
+        console.error('💡 Possible causes:')
+        console.error('   1. Supabase project is paused (check Supabase dashboard)')
+        console.error('   2. Incorrect NEXT_PUBLIC_SUPABASE_URL in .env.local')
+        console.error('   3. Network connectivity issues')
+        console.error('   4. CORS configuration issue')
+        console.error('')
+        console.error('Current Supabase URL:', supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'NOT SET')
+        return []
+      }
       
       // Common error messages
       if (error.code === 'PGRST116') {
@@ -105,7 +122,16 @@ export async function fetchPropertiesByType(listingType: 'buy' | 'rent'): Promis
     }) || []
 
     return filteredData
-  } catch (error) {
+  } catch (error: any) {
+    // Catch network errors and other exceptions
+    if (error?.message?.includes('Failed to fetch') || error?.name === 'TypeError') {
+      console.error('🌐 NETWORK ERROR: Failed to connect to Supabase')
+      console.error('💡 Please check:')
+      console.error('   1. Your .env.local file has NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY')
+      console.error('   2. Your Supabase project is active (not paused)')
+      console.error('   3. Your internet connection is working')
+      return []
+    }
     console.error('Error in fetchPropertiesByType:', error)
     return []
   }

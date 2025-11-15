@@ -17,13 +17,15 @@ interface MenuItem {
   icon: React.ComponentType<{ className?: string }>
   href: string
   badge?: string | number
+  color: string // Color for the icon
+  hoverColor: string // Color when hovering
 }
 
 const menuItems: MenuItem[] = [
-  { title: 'Dashboard', icon: LayoutDashboard, href: '/dashboard/admin' },
-  { title: 'All properties', icon: Home, href: '/dashboard/admin/properties' },
-  { title: 'Real Estate Companies', icon: Building2, href: '/dashboard/admin/companies' },
-  { title: 'Site Users', icon: Users, href: '/dashboard/admin/users' },
+  { title: 'Dashboard', icon: LayoutDashboard, href: '/dashboard/admin', color: 'text-indigo-600', hoverColor: 'group-hover:text-indigo-700' },
+  { title: 'All properties', icon: Home, href: '/dashboard/admin/properties', color: 'text-blue-600', hoverColor: 'group-hover:text-blue-700' },
+  { title: 'Real Estate Companies', icon: Building2, href: '/dashboard/admin/companies', color: 'text-orange-600', hoverColor: 'group-hover:text-orange-700' },
+  { title: 'Site Users', icon: Users, href: '/dashboard/admin/users', color: 'text-pink-600', hoverColor: 'group-hover:text-pink-700' },
 ]
 
 export function AdminSidebar() {
@@ -96,8 +98,8 @@ export function AdminSidebar() {
                 <Icon className={cn(
                   "h-5 w-5 flex-shrink-0 transition-colors duration-200",
                   isActive 
-                    ? "text-primary" 
-                    : "text-blue-600 group-hover:text-primary"
+                    ? item.color
+                    : `${item.color} ${item.hoverColor}`
                 )} />
                 <span 
                   className={cn(

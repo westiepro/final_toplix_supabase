@@ -5,7 +5,8 @@ import dynamic from 'next/dynamic'
 import { Marker, ViewState } from 'react-map-gl/mapbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Plus, Minus, Satellite } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 const MapboxMap = dynamic(() => import('react-map-gl/mapbox').then((mod) => mod.default), {
   ssr: false,
@@ -46,10 +47,9 @@ export function LocationPicker({
   const [citySearch, setCitySearch] = useState(initialCity || '')
   const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const [markerPosition, setMarkerPosition] = useState<[number, number]>([
-    hasValidCoordinates ? (initialLongitude ?? defaultLng) : defaultLng,
-    hasValidCoordinates ? (initialLatitude ?? defaultLat) : defaultLat,
-  ])
+  const [markerPosition, setMarkerPosition] = useState<[number, number] | null>(
+    hasValidCoordinates ? [initialLongitude ?? defaultLng, initialLatitude ?? defaultLat] : null
+  )
   const [viewState, setViewState] = useState<ViewState>({
     longitude: hasValidCoordinates ? (initialLongitude ?? defaultLng) : defaultLng,
     latitude: hasValidCoordinates ? (initialLatitude ?? defaultLat) : defaultLat,
@@ -59,6 +59,8 @@ export function LocationPicker({
     padding: { top: 0, bottom: 0, left: 0, right: 0 },
   })
   const [isGeocoding, setIsGeocoding] = useState(false)
+  const [mapStyle, setMapStyle] = useState<'mapbox://styles/mapbox/streets-v12' | 'mapbox://styles/mapbox/satellite-v9'>('mapbox://styles/mapbox/streets-v12')
+  const mapRef = useRef<any>(null)
   const searchDebounceTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Search for cities in Portugal and Spain
@@ -179,6 +181,43 @@ export function LocationPicker({
     reverseGeocode(lng, lat)
   }
 
+  // Handle zoom in
+  const handleZoomIn = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (mapRef.current) {
+      const map = mapRef.current.getMap()
+      if (map) {
+        const newZoom = Math.min(viewState.zoom + 1, 22)
+        map.zoomTo(newZoom, { duration: 300 })
+        // Don't update viewState here - let onMove handler sync it during animation
+      }
+    }
+  }
+
+  // Handle zoom out
+  const handleZoomOut = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (mapRef.current) {
+      const map = mapRef.current.getMap()
+      if (map) {
+        const newZoom = Math.max(viewState.zoom - 1, 0)
+        map.zoomTo(newZoom, { duration: 300 })
+        // Don't update viewState here - let onMove handler sync it during animation
+      }
+    }
+  }
+
+  // Toggle map style
+  const toggleMapStyle = () => {
+    setMapStyle((prev) =>
+      prev === 'mapbox://styles/mapbox/streets-v12'
+        ? 'mapbox://styles/mapbox/satellite-v9'
+        : 'mapbox://styles/mapbox/streets-v12'
+    )
+  }
+
   // Initialize with existing coordinates if available (but don't auto-reverse geocode)
   useEffect(() => {
     if (hasValidCoordinates && initialLatitude && initialLongitude) {
@@ -190,6 +229,9 @@ export function LocationPicker({
         zoom: 12, // Zoom in for existing properties
       }))
       // Don't auto-reverse geocode on mount - let user drag marker if needed
+    } else {
+      // Don't show marker if no valid coordinates
+      setMarkerPosition(null)
     }
   }, [initialLatitude, initialLongitude, hasValidCoordinates])
 
@@ -257,19 +299,60 @@ export function LocationPicker({
           onClick={handleMapClick}
           mapboxAccessToken={mapboxToken}
           style={{ width: '100%', height: '100%' }}
-          mapStyle="mapbox://styles/mapbox/streets-v12"
+          mapStyle={mapStyle}
           cursor="crosshair"
+          dragPan={false}
+          dragRotate={false}
+          scrollZoom={false}
+          doubleClickZoom={false}
+          touchZoom={false}
+          touchRotate={false}
+          ref={mapRef}
         >
-          <Marker
-            longitude={markerPosition[0]}
-            latitude={markerPosition[1]}
-            anchor="center"
-          >
-            <div className="pointer-events-none">
-              <div className="h-6 w-6 rounded-full border-2 border-white bg-red-500 shadow-lg" />
-            </div>
-          </Marker>
+          {markerPosition && (
+            <Marker
+              longitude={markerPosition[0]}
+              latitude={markerPosition[1]}
+              anchor="center"
+            >
+              <div className="pointer-events-none">
+                <div className="h-6 w-6 rounded-full border-2 border-white bg-red-500 shadow-lg" />
+              </div>
+            </Marker>
+          )}
         </MapboxMap>
+        
+        {/* Zoom Controls */}
+        <div className="absolute top-4 right-4 z-10 flex flex-col bg-white rounded-lg border shadow-lg overflow-hidden">
+          <button
+            type="button"
+            onClick={handleZoomIn}
+            className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 transition-colors border-b"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleZoomOut}
+            className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 transition-colors"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Map Style Toggle */}
+        <div className="absolute top-4 left-4 z-10">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={toggleMapStyle}
+            className="bg-white hover:bg-gray-50"
+          >
+            <Satellite className="h-4 w-4 mr-2" />
+            {mapStyle === 'mapbox://styles/mapbox/satellite-v9' ? 'Map' : 'Satellite'}
+          </Button>
+        </div>
       </div>
       <p className="text-xs text-muted-foreground">
         Click on the map to set the exact property location

@@ -8,6 +8,13 @@ import { geocodeCity, PropertyMapRef } from '@/components/property-map'
 import { Property } from '@/types/property'
 import { Loader2 } from 'lucide-react'
 import { fetchPropertiesByType } from '@/lib/properties'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 const PropertyMap = dynamic(
   () => import('@/components/property-map').then((mod) => mod.PropertyMap),
@@ -35,11 +42,14 @@ export default function BuyPage() {
     bedrooms: 'all',
     bathrooms: 'all',
     minArea: 0,
-    maxArea: 10000,
+    maxArea: 500,
+    features: [],
   })
-  const [mapCenter, setMapCenter] = useState<[number, number]>([-7.9322, 37.0194]) // Faro, Algarve
-  const [mapZoom, setMapZoom] = useState(10)
+  const [mapCenter, setMapCenter] = useState<[number, number]>([-8.0, 37.1]) // Center of Algarve region
+  const [mapZoom, setMapZoom] = useState(8.5) // Zoom level to show all of Algarve
   const [loading, setLoading] = useState(true)
+  const [sortBy, setSortBy] = useState<string>('newest')
+  const [hoveredPropertyId, setHoveredPropertyId] = useState<string | null>(null)
   const mapRef = useRef<PropertyMapRef>(null)
 
   const applyFilters = useCallback(() => {
@@ -67,12 +77,24 @@ export default function BuyPage() {
 
     // Filter by bedrooms
     if (filters.bedrooms !== 'all') {
-      filtered = filtered.filter((p) => p.bedrooms >= (filters.bedrooms as number))
+      if (Array.isArray(filters.bedrooms)) {
+        // Multiple values selected - show properties with any of these bedroom counts
+        filtered = filtered.filter((p) => (filters.bedrooms as number[]).includes(p.bedrooms))
+      } else {
+        // Single value selected - show properties with exact bedroom count
+        filtered = filtered.filter((p) => p.bedrooms === filters.bedrooms)
+      }
     }
 
     // Filter by bathrooms
     if (filters.bathrooms !== 'all') {
-      filtered = filtered.filter((p) => p.bathrooms >= (filters.bathrooms as number))
+      if (Array.isArray(filters.bathrooms)) {
+        // Multiple values selected - show properties with any of these bathroom counts
+        filtered = filtered.filter((p) => (filters.bathrooms as number[]).includes(p.bathrooms))
+      } else {
+        // Single value selected - show properties with exact bathroom count
+        filtered = filtered.filter((p) => p.bathrooms === filters.bathrooms)
+      }
     }
 
     // Filter by area
@@ -83,6 +105,29 @@ export default function BuyPage() {
     setFilteredProperties(filtered)
     setViewportProperties(filtered)
   }, [properties, filters])
+
+  const sortProperties = useCallback((props: Property[], sortOption: string): Property[] => {
+    const sorted = [...props]
+    
+    switch (sortOption) {
+      case 'newest':
+        return sorted.sort((a, b) => {
+          const dateA = new Date(a.created_at).getTime()
+          const dateB = new Date(b.created_at).getTime()
+          return dateB - dateA // Newest first
+        })
+      case 'price-low-to-high':
+        return sorted.sort((a, b) => a.price - b.price)
+      case 'price-high-to-low':
+        return sorted.sort((a, b) => b.price - a.price)
+      case 'area-high-to-low':
+        return sorted.sort((a, b) => b.area - a.area)
+      default:
+        return sorted
+    }
+  }, [])
+
+  const sortedViewportProperties = sortProperties(viewportProperties, sortBy)
 
   useEffect(() => {
     applyFilters()
@@ -182,19 +227,44 @@ export default function BuyPage() {
         onFiltersChange={handleFiltersChange}
         onCitySearch={handleCitySearch}
         onSaveSearch={handleSaveSearch}
+        filteredCount={filteredProperties.length}
+        properties={properties}
       />
       <div className="flex flex-1 overflow-hidden">
         {/* Property Cards - Left Side */}
         <div className="w-full overflow-y-auto border-r bg-background lg:w-1/2">
           <div className="container mx-auto p-4">
-            {viewportProperties.length === 0 ? (
+            {/* Sort Dropdown and Property Counter */}
+            <div className="mb-4 flex items-center justify-end gap-4">
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest</SelectItem>
+                  <SelectItem value="price-low-to-high">Price: Low to High</SelectItem>
+                  <SelectItem value="price-high-to-low">Price: High to Low</SelectItem>
+                  <SelectItem value="area-high-to-low">Square Meter: High to Low</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="text-sm text-muted-foreground">
+                {sortedViewportProperties.length} {sortedViewportProperties.length === 1 ? 'home' : 'homes'}
+              </div>
+            </div>
+            
+            {sortedViewportProperties.length === 0 ? (
               <div className="flex h-full items-center justify-center py-12">
                 <p className="text-muted-foreground">No properties found in this area</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {viewportProperties.map((property) => (
-                  <PropertyCard key={property.id} property={property} />
+                {sortedViewportProperties.map((property) => (
+                  <PropertyCard 
+                    key={property.id} 
+                    property={property}
+                    onMouseEnter={() => setHoveredPropertyId(property.id)}
+                    onMouseLeave={() => setHoveredPropertyId(null)}
+                  />
                 ))}
               </div>
             )}
@@ -209,6 +279,7 @@ export default function BuyPage() {
             onViewportChange={handleViewportChange}
             initialCenter={mapCenter}
             initialZoom={mapZoom}
+            hoveredPropertyId={hoveredPropertyId}
           />
         </div>
       </div>
