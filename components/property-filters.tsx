@@ -599,7 +599,7 @@ function PropertyFiltersComponent({
 
   const handlePropertyTypeReset = useCallback(() => {
     setFilters((prev) => {
-      const newFilters = { ...prev, propertyType: 'all' }
+      const newFilters: FilterState = { ...prev, propertyType: 'all' as const }
       notifyParent(newFilters)
       return newFilters
     })
